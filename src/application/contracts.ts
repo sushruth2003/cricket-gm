@@ -1,0 +1,160 @@
+import { z } from 'zod'
+
+const battingRatingSchema = z.object({
+  overall: z.number().int().min(1).max(99),
+  traits: z.object({
+    timing: z.number().int().min(1).max(99),
+    power: z.number().int().min(1).max(99),
+    placement: z.number().int().min(1).max(99),
+    runningBetweenWickets: z.number().int().min(1).max(99),
+    composure: z.number().int().min(1).max(99),
+  }),
+})
+
+const bowlingRatingSchema = z.object({
+  style: z.enum(['pace', 'spin']),
+  overall: z.number().int().min(1).max(99),
+  traits: z.object({
+    accuracy: z.number().int().min(1).max(99),
+    movement: z.number().int().min(1).max(99),
+    variations: z.number().int().min(1).max(99),
+    control: z.number().int().min(1).max(99),
+    deathExecution: z.number().int().min(1).max(99),
+  }),
+})
+
+const fieldingRatingSchema = z.object({
+  overall: z.number().int().min(1).max(99),
+  traits: z.object({
+    catching: z.number().int().min(1).max(99),
+    groundFielding: z.number().int().min(1).max(99),
+    throwing: z.number().int().min(1).max(99),
+    wicketkeeping: z.number().int().min(1).max(99),
+  }),
+})
+
+const playerSchema = z.object({
+  id: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+  countryTag: z.string(),
+  role: z.enum(['batter', 'bowler', 'wicketkeeper', 'allrounder']),
+  basePrice: z.number().int().min(1),
+  ratings: z.object({
+    batting: battingRatingSchema,
+    bowling: bowlingRatingSchema,
+    fielding: fieldingRatingSchema,
+    temperament: z.number().int().min(1).max(99),
+    fitness: z.number().int().min(1).max(99),
+  }),
+  teamId: z.string().nullable(),
+})
+
+const teamSchema = z.object({
+  id: z.string(),
+  city: z.string(),
+  name: z.string(),
+  shortName: z.string(),
+  color: z.string(),
+  budgetRemaining: z.number().int().min(0),
+  rosterPlayerIds: z.array(z.string()),
+  playingXi: z.array(z.string()),
+  wicketkeeperPlayerId: z.string().nullable(),
+  bowlingPreset: z.enum(['balanced', 'aggressive', 'defensive']),
+  points: z.number().int(),
+  wins: z.number().int(),
+  losses: z.number().int(),
+  ties: z.number().int(),
+  netRunRate: z.number(),
+})
+
+const inningsSchema = z.object({
+  battingTeamId: z.string(),
+  bowlingTeamId: z.string(),
+  wicketkeeperPlayerId: z.string().nullable(),
+  runs: z.number().int().min(0),
+  wickets: z.number().int().min(0).max(10),
+  overs: z.number().min(0).max(20),
+  batting: z.array(
+    z.object({
+      playerId: z.string(),
+      runs: z.number().int().min(0),
+      balls: z.number().int().min(0),
+      fours: z.number().int().min(0),
+      sixes: z.number().int().min(0),
+      out: z.boolean(),
+    }),
+  ),
+  bowling: z.array(
+    z.object({
+      playerId: z.string(),
+      overs: z.number().min(0).max(4),
+      runsConceded: z.number().int().min(0),
+      wickets: z.number().int().min(0),
+    }),
+  ),
+})
+
+const matchSchema = z.object({
+  id: z.string(),
+  homeTeamId: z.string(),
+  awayTeamId: z.string(),
+  venue: z.string(),
+  round: z.number().int().min(1),
+  played: z.boolean(),
+  winnerTeamId: z.string().nullable(),
+  margin: z.string(),
+  innings: z.tuple([inningsSchema, inningsSchema]).nullable(),
+})
+
+export const gameSaveSchema = z.object({
+  metadata: z.object({
+    schemaVersion: z.literal(2),
+    engineVersion: z.string(),
+    seed: z.number().int(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  }),
+  config: z.object({
+    teamCount: z.number().int().min(2).max(20),
+    format: z.literal('T20'),
+    auctionBudget: z.number().int().min(1),
+    minSquadSize: z.number().int().min(11),
+    maxSquadSize: z.number().int().min(11),
+    seasonSeed: z.number().int(),
+  }),
+  simulation: z.object({
+    deterministicCore: z.boolean(),
+    liveViewNarrationMode: z.literal('non_authoritative'),
+  }),
+  phase: z.enum(['auction', 'regular-season', 'playoffs', 'complete']),
+  userTeamId: z.string(),
+  teams: z.array(teamSchema),
+  players: z.array(playerSchema),
+  auction: z.object({
+    currentNominationIndex: z.number().int().min(0),
+    entries: z.array(
+      z.object({
+        playerId: z.string(),
+        soldToTeamId: z.string().nullable(),
+        finalPrice: z.number().int().min(0),
+      }),
+    ),
+    complete: z.boolean(),
+  }),
+  fixtures: z.array(matchSchema),
+  stats: z.record(
+    z.string(),
+    z.object({
+      playerId: z.string(),
+      matches: z.number().int().min(0),
+      runs: z.number().int().min(0),
+      balls: z.number().int().min(0),
+      wickets: z.number().int().min(0),
+      overs: z.number().min(0),
+      runsConceded: z.number().int().min(0),
+    }),
+  ),
+})
+
+export type GameSaveV1 = z.infer<typeof gameSaveSchema>

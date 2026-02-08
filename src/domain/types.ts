@@ -1,0 +1,151 @@
+export type Phase = 'auction' | 'regular-season' | 'playoffs' | 'complete'
+
+export type BowlingStyle = 'pace' | 'spin'
+export type PlayerRole = 'batter' | 'bowler' | 'wicketkeeper' | 'allrounder'
+
+export type BattingTrait = 'timing' | 'power' | 'placement' | 'runningBetweenWickets' | 'composure'
+export type BowlingTrait = 'accuracy' | 'movement' | 'variations' | 'control' | 'deathExecution'
+export type FieldingTrait = 'catching' | 'groundFielding' | 'throwing' | 'wicketkeeping'
+
+export interface SkillRating<TTrait extends string = string> {
+  overall: number
+  traits: Record<TTrait, number>
+}
+
+export interface SaveMetadata {
+  schemaVersion: number
+  engineVersion: string
+  seed: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LeagueConfig {
+  teamCount: number
+  format: 'T20'
+  auctionBudget: number
+  minSquadSize: number
+  maxSquadSize: number
+  seasonSeed: number
+}
+
+export interface SimulationConfig {
+  deterministicCore: boolean
+  liveViewNarrationMode: 'non_authoritative'
+}
+
+export interface Team {
+  id: string
+  city: string
+  name: string
+  shortName: string
+  color: string
+  budgetRemaining: number
+  rosterPlayerIds: string[]
+  playingXi: string[]
+  wicketkeeperPlayerId: string | null
+  bowlingPreset: 'balanced' | 'aggressive' | 'defensive'
+  points: number
+  wins: number
+  losses: number
+  ties: number
+  netRunRate: number
+}
+
+export interface PlayerRatings {
+  batting: SkillRating<BattingTrait>
+  bowling: SkillRating<BowlingTrait> & { style: BowlingStyle }
+  fielding: SkillRating<FieldingTrait>
+  temperament: number
+  fitness: number
+}
+
+export interface Player {
+  id: string
+  firstName: string
+  lastName: string
+  countryTag: string
+  role: PlayerRole
+  basePrice: number
+  ratings: PlayerRatings
+  teamId: string | null
+}
+
+export interface AuctionEntry {
+  playerId: string
+  soldToTeamId: string | null
+  finalPrice: number
+}
+
+export interface AuctionState {
+  currentNominationIndex: number
+  entries: AuctionEntry[]
+  complete: boolean
+}
+
+export interface PlayerBattingLine {
+  playerId: string
+  runs: number
+  balls: number
+  fours: number
+  sixes: number
+  out: boolean
+}
+
+export interface PlayerBowlingLine {
+  playerId: string
+  overs: number
+  runsConceded: number
+  wickets: number
+}
+
+export interface InningsSummary {
+  battingTeamId: string
+  bowlingTeamId: string
+  wicketkeeperPlayerId: string | null
+  runs: number
+  wickets: number
+  overs: number
+  batting: PlayerBattingLine[]
+  bowling: PlayerBowlingLine[]
+}
+
+export interface MatchResult {
+  id: string
+  homeTeamId: string
+  awayTeamId: string
+  venue: string
+  round: number
+  played: boolean
+  winnerTeamId: string | null
+  margin: string
+  innings: [InningsSummary, InningsSummary] | null
+}
+
+export interface StatLine {
+  playerId: string
+  matches: number
+  runs: number
+  balls: number
+  wickets: number
+  overs: number
+  runsConceded: number
+}
+
+export interface GameState {
+  metadata: SaveMetadata
+  config: LeagueConfig
+  simulation: SimulationConfig
+  phase: Phase
+  userTeamId: string
+  teams: Team[]
+  players: Player[]
+  auction: AuctionState
+  fixtures: MatchResult[]
+  stats: Record<string, StatLine>
+}
+
+export interface SimulateSeasonProgress {
+  completedMatches: number
+  totalMatches: number
+}

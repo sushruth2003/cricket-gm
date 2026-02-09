@@ -8,6 +8,7 @@ import type {
   GameState,
   LeagueConfig,
   Player,
+  PlayerLastSeasonStats,
   PlayerRatings,
   PlayerRole,
   SkillRating,
@@ -96,8 +97,16 @@ const lastNames = [
 ]
 const colors = ['#0b1f3a', '#9d1d20', '#1f6f8b', '#f4a300', '#2f5233', '#702963', '#4b6cb7', '#7b241c', '#2e4053', '#0e6655']
 const basePriceTiers = [200, 150, 125, 100, 75, 50, 40, 30]
+const roleWeights: Array<{ role: PlayerRole; weight: number }> = [
+  { role: 'batter', weight: 0.34 },
+  { role: 'bowler', weight: 0.31 },
+  { role: 'allrounder', weight: 0.25 },
+  { role: 'wicketkeeper', weight: 0.1 },
+]
 
 const clamp = (value: number, min = 20, max = 99) => Math.max(min, Math.min(max, value))
+
+const average = (values: number[]) => Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
 
 const makeSkillRating = <TTrait extends string>(
   base: number,
@@ -118,21 +127,77 @@ const makeSkillRating = <TTrait extends string>(
   }
 }
 
-const deriveRole = (ratings: PlayerRatings): PlayerRole => {
-  const batting = ratings.batting.overall
-  const bowling = ratings.bowling.overall
-  const keeping = ratings.fielding.traits.wicketkeeping
-
-  if (batting >= 65 && bowling >= 60) {
-    return 'allrounder'
-  }
-  if (bowling >= 62) {
-    return 'bowler'
-  }
-  if (keeping >= 78 && batting >= 50 && bowling <= 70) {
-    return 'wicketkeeper'
+const pickRoleArchetype = (roll: number): PlayerRole => {
+  let cumulative = 0
+  for (const { role, weight } of roleWeights) {
+    cumulative += weight
+    if (roll <= cumulative) {
+      return role
+    }
   }
   return 'batter'
+}
+
+const shiftSkill = <TTrait extends string>(
+  skill: SkillRating<TTrait>,
+  delta: number,
+  capMin = 20,
+  capMax = 99,
+): SkillRating<TTrait> => {
+  const nextTraits = {} as Record<TTrait, number>
+
+  for (const [trait, traitValue] of Object.entries(skill.traits) as Array<[TTrait, number]>) {
+    nextTraits[trait] = clamp(traitValue + delta, capMin, capMax)
+  }
+
+  return {
+    traits: nextTraits,
+    overall: average(Object.values(nextTraits)),
+  }
+}
+
+const tuneRatingsForRole = (ratings: PlayerRatings, role: PlayerRole): PlayerRatings => {
+  const tuned: PlayerRatings = structuredClone(ratings)
+
+  if (role === 'batter') {
+    tuned.batting = shiftSkill(tuned.batting, 6, 35, 99)
+    tuned.bowling = {
+      ...shiftSkill(tuned.bowling, -12, 20, 75),
+      style: tuned.bowling.style,
+    }
+    tuned.fielding = shiftSkill(tuned.fielding, 1)
+    return tuned
+  }
+
+  if (role === 'bowler') {
+    tuned.batting = shiftSkill(tuned.batting, -11, 20, 76)
+    tuned.bowling = {
+      ...shiftSkill(tuned.bowling, 8, 42, 99),
+      style: tuned.bowling.style,
+    }
+    tuned.fielding = shiftSkill(tuned.fielding, 1)
+    return tuned
+  }
+
+  if (role === 'wicketkeeper') {
+    tuned.batting = shiftSkill(tuned.batting, -1, 32, 89)
+    tuned.bowling = {
+      ...shiftSkill(tuned.bowling, -16, 20, 70),
+      style: tuned.bowling.style,
+    }
+    tuned.fielding = shiftSkill(tuned.fielding, 4, 35, 99)
+    tuned.fielding.traits.wicketkeeping = clamp(tuned.fielding.traits.wicketkeeping + 22, 70, 99)
+    tuned.fielding.overall = average(Object.values(tuned.fielding.traits))
+    return tuned
+  }
+
+  tuned.batting = shiftSkill(tuned.batting, 1, 45, 90)
+  tuned.bowling = {
+    ...shiftSkill(tuned.bowling, 1, 45, 88),
+    style: tuned.bowling.style,
+  }
+  tuned.fielding = shiftSkill(tuned.fielding, 2, 35, 90)
+  return tuned
 }
 
 const makeRatings = (seedValue: number, style: BowlingStyle): PlayerRatings => {
@@ -169,6 +234,92 @@ const makeRatings = (seedValue: number, style: BowlingStyle): PlayerRatings => {
     fielding,
     temperament: clamp(seedValue + 1),
     fitness: clamp(seedValue + 5),
+  }
+}
+
+const makeLastSeasonStats = (prng: ReturnType<typeof createPrng>, role: PlayerRole, ratings: PlayerRatings): PlayerLastSeasonStats => {
+  const matches = prng.nextInt(6, 16)
+  const battingSkill = ratings.batting.overall
+  const bowlingSkill = ratings.bowling.overall
+
+  const runsBase = Math.max(0, Math.round(((battingSkill - 35) * matches * (role === 'bowler' ? 0.45 : 0.95)) / 2))
+  const wicketsBase = Math.max(0, Math.round(((bowlingSkill - 35) * matches * (role === 'batter' ? 0.35 : 0.95)) / 18))
+
+  return {
+    matches,
+    runs: runsBase + prng.nextInt(0, 90),
+    wickets: wicketsBase + prng.nextInt(0, role === 'bowler' ? 5 : 3),
+    strikeRate: clamp(90 + (battingSkill - 40) * 1.1 + prng.nextInt(-12, 18), 70, 220),
+    economy: Math.max(4, Math.min(12, Number((9.2 - (bowlingSkill - 45) * 0.04 + prng.nextInt(-8, 8) / 10).toFixed(1)))),
+  }
+}
+
+const regressProspectRatings = (ratings: PlayerRatings, prng: ReturnType<typeof createPrng>): PlayerRatings => {
+  const battingPenalty = prng.nextInt(6, 14)
+  const bowlingPenalty = prng.nextInt(6, 14)
+  const fieldingPenalty = prng.nextInt(4, 11)
+
+  return {
+    batting: shiftSkill(ratings.batting, -battingPenalty, 30, 90),
+    bowling: {
+      ...shiftSkill(ratings.bowling, -bowlingPenalty, 30, 90),
+      style: ratings.bowling.style,
+    },
+    fielding: shiftSkill(ratings.fielding, -fieldingPenalty, 30, 90),
+    temperament: clamp(ratings.temperament - prng.nextInt(4, 12), 30, 95),
+    fitness: clamp(ratings.fitness - prng.nextInt(0, 6), 35, 95),
+  }
+}
+
+const projectPotential = (ratings: PlayerRatings, prng: ReturnType<typeof createPrng>) => ({
+  battingOverall: clamp(ratings.batting.overall + prng.nextInt(8, 20), 35, 99),
+  bowlingOverall: clamp(ratings.bowling.overall + prng.nextInt(8, 20), 35, 99),
+  fieldingOverall: clamp(ratings.fielding.overall + prng.nextInt(7, 16), 35, 99),
+  temperament: clamp(ratings.temperament + prng.nextInt(5, 14), 35, 99),
+  fitness: clamp(ratings.fitness + prng.nextInt(4, 10), 40, 99),
+})
+
+const projectFirstClassNumbers = (
+  role: PlayerRole,
+  potential: {
+    battingOverall: number
+    bowlingOverall: number
+    fieldingOverall: number
+    temperament: number
+    fitness: number
+  },
+) => {
+  const battingFactor = role === 'bowler' ? 0.55 : role === 'allrounder' ? 0.88 : 1
+  const bowlingFactor = role === 'batter' ? 0.45 : role === 'allrounder' ? 0.88 : 1
+  const runs = Math.max(120, Math.round((potential.battingOverall - 30) * 9 * battingFactor))
+  const wickets = Math.max(6, Math.round(((potential.bowlingOverall - 30) * bowlingFactor) / 2.1))
+  return {
+    runs,
+    wickets,
+    strikeRate: clamp(96 + (potential.battingOverall - 45) * 1.05, 75, 185),
+    economy: Math.max(4, Math.min(8.8, Number((8.6 - (potential.bowlingOverall - 50) * 0.028).toFixed(1)))),
+  }
+}
+
+const calculateProspectCount = (poolSize: number, teamCount: number): number => {
+  const target = Math.max(teamCount * 2, Math.round(poolSize * 0.08))
+  return Math.max(6, Math.min(target, Math.floor(poolSize * 0.2)))
+}
+
+const softenEliteAllrounders = (role: PlayerRole, ratings: PlayerRatings, prng: ReturnType<typeof createPrng>): PlayerRatings => {
+  if (role !== 'allrounder') {
+    return ratings
+  }
+  if (ratings.batting.overall < 88 || ratings.bowling.overall < 84 || prng.next() > 0.7) {
+    return ratings
+  }
+  return {
+    ...ratings,
+    batting: shiftSkill(ratings.batting, -prng.nextInt(3, 7), 45, 96),
+    bowling: {
+      ...shiftSkill(ratings.bowling, -prng.nextInt(3, 7), 45, 95),
+      style: ratings.bowling.style,
+    },
   }
 }
 
@@ -210,37 +361,22 @@ export const generateTeams = (config: LeagueConfig): Team[] => {
 export const generatePlayers = (config: LeagueConfig): Player[] => {
   const prng = createPrng(config.seasonSeed + 101)
   const poolSize = config.teamCount * config.maxSquadSize
+  const prospectCount = calculateProspectCount(poolSize, config.teamCount)
+  const firstProspectIndex = poolSize - prospectCount
 
   return Array.from({ length: poolSize }, (_, index) => {
     const base = prng.nextInt(35, 88)
     const bowlingStyle: BowlingStyle = prng.next() > 0.5 ? 'pace' : 'spin'
-    const ratings = makeRatings(base, bowlingStyle)
-    const role = deriveRole(ratings)
-
-    // Slight role bias to make auction and lineups feel coherent.
-    if (role === 'bowler') {
-      ratings.bowling.overall = clamp(ratings.bowling.overall + 4)
-    }
-    if (role === 'batter') {
-      ratings.batting.overall = clamp(ratings.batting.overall + 4)
-    }
-    if (role === 'wicketkeeper') {
-      ratings.bowling.overall = clamp(ratings.bowling.overall - 10)
-      ratings.fielding.traits.wicketkeeping = clamp(ratings.fielding.traits.wicketkeeping + 10)
-      ratings.fielding.overall = clamp(
-        Math.round(
-          (ratings.fielding.traits.catching +
-            ratings.fielding.traits.groundFielding +
-            ratings.fielding.traits.throwing +
-            ratings.fielding.traits.wicketkeeping) /
-            4,
-        ),
-      )
-    }
+    const targetRole = pickRoleArchetype(prng.next())
+    const tunedRatings = softenEliteAllrounders(targetRole, tuneRatingsForRole(makeRatings(base, bowlingStyle), targetRole), prng)
+    const role = targetRole
 
     const countryTag = prng.pick(countryTags)
     const isIndian = countryTag === 'IN'
-    const capped = !isIndian || prng.next() > 0.45
+    const isProspect = index >= firstProspectIndex
+    const ratings = isProspect ? regressProspectRatings(tunedRatings, prng) : tunedRatings
+    const capped = isProspect ? false : !isIndian || prng.next() > 0.45
+    const potential = isProspect ? projectPotential(ratings, prng) : null
 
     return {
       id: `player-${index + 1}`,
@@ -249,11 +385,25 @@ export const generatePlayers = (config: LeagueConfig): Player[] => {
       countryTag,
       capped,
       role,
-      basePrice: prng.pick(basePriceTiers),
+      age: isProspect ? prng.nextInt(18, 21) : prng.nextInt(23, 35),
+      basePrice: isProspect ? prng.nextInt(20, 40) : prng.pick(basePriceTiers),
+      lastSeasonStats: makeLastSeasonStats(prng, role, ratings),
       ratings,
+      development:
+        isProspect && potential
+          ? {
+              isProspect: true,
+              potential,
+              firstClassProjection: projectFirstClassNumbers(role, potential),
+            }
+          : undefined,
       teamId: null,
     }
   })
+}
+
+export const generateYoungPlayers = (config: LeagueConfig): Player[] => {
+  return generatePlayers(config).filter((player) => player.development?.isProspect)
 }
 
 const playerOverall = (player: Player) =>

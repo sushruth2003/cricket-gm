@@ -1,4 +1,5 @@
 import { useApp } from '@/ui/useApp'
+import { formatCr } from '@/ui/format/currency'
 
 export const DashboardPage = () => {
   const { state, actions, views } = useApp()
@@ -40,7 +41,7 @@ export const DashboardPage = () => {
           <>
             <p>{userTeam.name}</p>
             <p>Points: {userTeam.points}</p>
-            <p>Budget Remaining: {userTeam.budgetRemaining}</p>
+            <p>Budget Remaining: {formatCr(userTeam.budgetRemaining)}</p>
           </>
         ) : (
           <p>Not available.</p>

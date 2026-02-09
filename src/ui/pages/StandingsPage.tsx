@@ -1,4 +1,5 @@
 import { useApp } from '@/ui/useApp'
+import { formatCr } from '@/ui/format/currency'
 
 export const StandingsPage = () => {
   const { views } = useApp()
@@ -24,7 +25,7 @@ export const StandingsPage = () => {
                 <td>{team.points}</td>
                 <td>{team.wins}</td>
                 <td>{team.losses}</td>
-                <td>{team.budgetRemaining}</td>
+                <td>{formatCr(team.budgetRemaining)}</td>
               </tr>
             ))}
           </tbody>

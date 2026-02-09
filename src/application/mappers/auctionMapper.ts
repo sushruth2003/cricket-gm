@@ -6,6 +6,11 @@ export interface AuctionEntryView {
   phase: string
   status: string
   basePrice: number
+  lastSeasonMatches: number
+  lastSeasonRuns: number
+  lastSeasonWickets: number
+  lastSeasonStrikeRate: number
+  lastSeasonEconomy: number
   soldToTeam: string | null
   finalPrice: number
 }
@@ -22,6 +27,11 @@ export const toAuctionView = (auction: AuctionState, players: Player[], teams: T
       phase: entry.phase,
       status: entry.status,
       basePrice: player?.basePrice ?? 0,
+      lastSeasonMatches: player?.lastSeasonStats.matches ?? 0,
+      lastSeasonRuns: player?.lastSeasonStats.runs ?? 0,
+      lastSeasonWickets: player?.lastSeasonStats.wickets ?? 0,
+      lastSeasonStrikeRate: player?.lastSeasonStats.strikeRate ?? 0,
+      lastSeasonEconomy: player?.lastSeasonStats.economy ?? 0,
       soldToTeam: entry.soldToTeamId ? teamById.get(entry.soldToTeamId)?.name ?? entry.soldToTeamId : null,
       finalPrice: entry.finalPrice,
     }

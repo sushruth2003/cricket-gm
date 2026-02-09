@@ -40,7 +40,15 @@ const playerSchema = z.object({
   countryTag: z.string(),
   capped: z.boolean(),
   role: z.enum(['batter', 'bowler', 'wicketkeeper', 'allrounder']),
+  age: z.number().int().min(16).max(50).optional(),
   basePrice: z.number().int().min(1),
+  lastSeasonStats: z.object({
+    matches: z.number().int().min(0),
+    runs: z.number().int().min(0),
+    wickets: z.number().int().min(0),
+    strikeRate: z.number().min(0),
+    economy: z.number().min(0),
+  }),
   ratings: z.object({
     batting: battingRatingSchema,
     bowling: bowlingRatingSchema,
@@ -48,6 +56,24 @@ const playerSchema = z.object({
     temperament: z.number().int().min(1).max(99),
     fitness: z.number().int().min(1).max(99),
   }),
+  development: z
+    .object({
+      isProspect: z.boolean(),
+      potential: z.object({
+        battingOverall: z.number().int().min(1).max(99),
+        bowlingOverall: z.number().int().min(1).max(99),
+        fieldingOverall: z.number().int().min(1).max(99),
+        temperament: z.number().int().min(1).max(99),
+        fitness: z.number().int().min(1).max(99),
+      }),
+      firstClassProjection: z.object({
+        runs: z.number().int().min(0),
+        wickets: z.number().int().min(0),
+        strikeRate: z.number().min(0),
+        economy: z.number().min(0),
+      }),
+    })
+    .optional(),
   teamId: z.string().nullable(),
 })
 

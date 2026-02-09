@@ -1,22 +1,12 @@
-import { useMemo } from 'react'
+import { formatCr } from '@/ui/format/currency'
 import { useApp } from '@/ui/useApp'
-
-const toCr = (valueInLakhs: number) => {
-  if (valueInLakhs <= 0) {
-    return '0'
-  }
-  return `₹${(valueInLakhs / 100).toFixed(2)} Cr`
-}
 
 export const AuctionPage = () => {
   const { state, actions, views, saving } = useApp()
 
-  const currentEntry = useMemo(() => {
-    if (!state?.auction.currentPlayerId) {
-      return null
-    }
-    return views.auctionEntries.find((entry) => entry.playerId === state.auction.currentPlayerId) ?? null
-  }, [state?.auction.currentPlayerId, views.auctionEntries])
+  const currentEntry = state?.auction.currentPlayerId
+    ? (views.auctionEntries.find((entry) => entry.playerId === state.auction.currentPlayerId) ?? null)
+    : null
 
   if (!state) {
     return <p className="card">Create a league first.</p>
@@ -38,7 +28,11 @@ export const AuctionPage = () => {
         <div className="card" style={{ margin: '0.75rem 0' }}>
           <h3 style={{ marginTop: 0 }}>{currentEntry.playerName}</h3>
           <p>
-            Base: {toCr(currentEntry.basePrice)} | Current: {toCr(state.auction.currentBid)} | Next: {toCr(state.auction.currentBid + state.auction.currentBidIncrement)}
+            Base: {formatCr(currentEntry.basePrice)} | Current: {formatCr(state.auction.currentBid)} | Next: {formatCr(state.auction.currentBid + state.auction.currentBidIncrement)}
+          </p>
+          <p>
+            Last season: {currentEntry.lastSeasonMatches}M, {currentEntry.lastSeasonRuns}R, {currentEntry.lastSeasonWickets}W, SR{' '}
+            {currentEntry.lastSeasonStrikeRate.toFixed(1)}, Econ {currentEntry.lastSeasonEconomy.toFixed(1)}
           </p>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button onClick={() => actions.auctionBid()} disabled={state.auction.complete || saving}>
@@ -69,6 +63,7 @@ export const AuctionPage = () => {
               <th>Set</th>
               <th>Status</th>
               <th>Base</th>
+              <th>Prev Season</th>
               <th>Sold To</th>
               <th>Price</th>
             </tr>
@@ -79,9 +74,12 @@ export const AuctionPage = () => {
                 <td>{entry.playerName}</td>
                 <td>{entry.phase}</td>
                 <td>{entry.status}</td>
-                <td>{toCr(entry.basePrice)}</td>
+                <td>{formatCr(entry.basePrice)}</td>
+                <td>
+                  {entry.lastSeasonRuns}R/{entry.lastSeasonWickets}W ({entry.lastSeasonMatches}M)
+                </td>
                 <td>{entry.soldToTeam ?? 'Unsold'}</td>
-                <td>{toCr(entry.finalPrice)}</td>
+                <td>{formatCr(entry.finalPrice)}</td>
               </tr>
             ))}
           </tbody>

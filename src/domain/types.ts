@@ -62,6 +62,31 @@ export interface PlayerRatings {
   fitness: number
 }
 
+export interface PlayerLastSeasonStats {
+  matches: number
+  runs: number
+  wickets: number
+  strikeRate: number
+  economy: number
+}
+
+export interface PlayerDevelopment {
+  isProspect: boolean
+  potential: {
+    battingOverall: number
+    bowlingOverall: number
+    fieldingOverall: number
+    temperament: number
+    fitness: number
+  }
+  firstClassProjection: {
+    runs: number
+    wickets: number
+    strikeRate: number
+    economy: number
+  }
+}
+
 export interface Player {
   id: string
   firstName: string
@@ -69,8 +94,11 @@ export interface Player {
   countryTag: string
   capped: boolean
   role: PlayerRole
+  age?: number
   basePrice: number
+  lastSeasonStats: PlayerLastSeasonStats
   ratings: PlayerRatings
+  development?: PlayerDevelopment
   teamId: string | null
 }
 

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { formatCr } from '@/ui/format/currency'
 import { useApp } from '@/ui/useApp'
 
 type SortKey = 'name' | 'role' | 'bat' | 'bowl' | 'fielding' | 'fitness' | 'temperament'
@@ -145,7 +146,7 @@ export const RosterPage = () => {
             </div>
             <div className="metricTile">
               <span>Budget Left</span>
-              <strong>${Math.round(userTeam.budgetRemaining).toLocaleString()}M</strong>
+              <strong>{formatCr(userTeam.budgetRemaining)}</strong>
             </div>
           </div>
           <div className="teamLineStats">

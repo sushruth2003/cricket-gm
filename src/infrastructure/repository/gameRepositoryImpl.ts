@@ -1,6 +1,7 @@
 import { gameSaveSchema } from '@/application/contracts'
 import type { GameRepository } from '@/application/gameRepository'
 import type { GameState } from '@/domain/types'
+import { buildSeasonSummary, SeasonSummaryStore } from '@/infrastructure/repository/seasonSummaryStore'
 import type { SqliteStore } from '@/infrastructure/repository/sqliteStore'
 
 const SAVE_ID = 'primary'
@@ -106,6 +107,10 @@ const repairLegacySave = (raw: unknown): unknown => {
       fieldingRatings.traits && typeof fieldingRatings.traits === 'object'
         ? (fieldingRatings.traits as Record<string, unknown>)
         : {}
+    const lastSeasonStats =
+      player.lastSeasonStats && typeof player.lastSeasonStats === 'object'
+        ? (player.lastSeasonStats as Record<string, unknown>)
+        : {}
 
     const battingLegacy = asNumber(battingRatings.overall, asNumber(ratings.batting, asNumber(player.overall, 50)))
     const paceLegacy = asNumber(bowlingTraits.movement, asNumber(ratings.paceBowling, 45))
@@ -139,6 +144,13 @@ const repairLegacySave = (raw: unknown): unknown => {
       capped: asBoolean(player.capped, true),
       role: inferredRole,
       basePrice: Math.max(1, asInteger(player.basePrice, 10)),
+      lastSeasonStats: {
+        matches: Math.max(0, asInteger(lastSeasonStats.matches, 0)),
+        runs: Math.max(0, asInteger(lastSeasonStats.runs, 0)),
+        wickets: Math.max(0, asInteger(lastSeasonStats.wickets, 0)),
+        strikeRate: Math.max(0, asNumber(lastSeasonStats.strikeRate, 110)),
+        economy: Math.max(0, asNumber(lastSeasonStats.economy, 8.5)),
+      },
       ratings: {
         batting: {
           overall: clamp(asNumber(battingRatings.overall, battingLegacy)),
@@ -378,7 +390,10 @@ const repairLegacySave = (raw: unknown): unknown => {
 }
 
 export class GameRepositoryImpl implements GameRepository {
-  constructor(private readonly store: SqliteStore) {}
+  constructor(
+    private readonly store: SqliteStore,
+    private readonly seasonSummaryStore: SeasonSummaryStore = new SeasonSummaryStore(),
+  ) {}
 
   private async quarantineCorruptPayload(payload: string): Promise<void> {
     const backupId = `${SAVE_ID}-corrupt-${Date.now()}`
@@ -430,6 +445,13 @@ export class GameRepositoryImpl implements GameRepository {
 
   async save(state: GameState): Promise<void> {
     await this.store.writeState(SAVE_ID, JSON.stringify(state))
+    if (state.phase === 'complete') {
+      try {
+        await this.seasonSummaryStore.write(buildSeasonSummary(state))
+      } catch (error) {
+        console.warn('[storage] failed to write compact season summary', error)
+      }
+    }
   }
 
   async transaction<T>(run: (current: GameState | null) => Promise<{ nextState?: GameState; result: T }>): Promise<T> {

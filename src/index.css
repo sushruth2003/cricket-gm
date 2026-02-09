@@ -98,6 +98,33 @@ input {
   flex-wrap: wrap;
 }
 
+.fixturesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.fixturesHeader h2 {
+  margin: 0;
+}
+
+.viewToggle {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+.viewToggle button {
+  background: #fff;
+  color: #0f4c81;
+}
+
+.viewToggle button.active {
+  background: #0f4c81;
+  color: #f7fbff;
+}
+
 button,
 select,
 .fileInput {
@@ -121,6 +148,64 @@ button:disabled {
 
 .tableWrap {
   overflow: auto;
+}
+
+.playoffBracketWrap {
+  overflow-x: auto;
+  padding-bottom: 0.4rem;
+}
+
+.playoffBracket {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 0.8rem;
+  min-width: 760px;
+}
+
+.bracketColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.bracketColumn h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.playoffMatchCard,
+.playoffChampionCard {
+  background: linear-gradient(170deg, #f8fbff, #edf4ff);
+  border: 1px solid #c9dbf3;
+  border-radius: 10px;
+  padding: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.playoffMatchCard p,
+.playoffChampionCard p {
+  margin: 0;
+}
+
+.playoffMatchLabel {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0f4c81;
+}
+
+.playoffStatus {
+  color: #1e293b;
+  font-size: 0.9rem;
+}
+
+.playoffChampionCard strong {
+  font-size: 1.1rem;
+  color: #0f4c81;
 }
 
 table {
@@ -440,6 +525,11 @@ th {
   }
 
   .teamMetrics {
+    grid-template-columns: 1fr;
+  }
+
+  .playoffBracket {
+    min-width: 0;
     grid-template-columns: 1fr;
   }
 }

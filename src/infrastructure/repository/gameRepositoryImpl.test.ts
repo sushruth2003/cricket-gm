@@ -71,4 +71,22 @@ describe('GameRepositoryImpl', () => {
     expect(leagueA).toBeNull()
     expect(leagueB?.metadata.seed).toBe(4004)
   })
+
+  it('lists leagues and supports explicit active league switching', async () => {
+    const store = new InMemorySqliteStore()
+    const repository = new GameRepositoryImpl(store as unknown as SqliteStore)
+
+    await repository.save(createInitialState(5005), 'league-a')
+    await repository.save(createInitialState(6006), 'league-b')
+
+    const leagues = await repository.listLeagues()
+    expect(leagues.map((league) => league.id).sort()).toEqual(['league-a', 'league-b'])
+    expect(await repository.getActiveLeagueId()).toBe('league-b')
+
+    await repository.setActiveLeague('league-a')
+
+    expect(await repository.getActiveLeagueId()).toBe('league-a')
+    const active = await repository.load()
+    expect(active?.metadata.seed).toBe(5005)
+  })
 })

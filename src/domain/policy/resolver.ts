@@ -1,5 +1,5 @@
 import { IPL_CYCLE_YEARS, IPL_POLICY_BY_YEAR, LEGACY_DEFAULT_POLICY } from '@/domain/policy/iplPolicy'
-import type { AuctionPolicy, AuctionPolicyContext, AuctionType, ResolvedAuctionPolicy } from '@/domain/types'
+import type { AuctionPolicy, AuctionPolicyContext, AuctionType, GameState, ResolvedAuctionPolicy } from '@/domain/types'
 
 const FALLBACK_SEASON_YEAR = 2025
 
@@ -56,5 +56,14 @@ export const resolveAuctionPolicyForSeason = (context: AuctionPolicyContext = {}
   return {
     policy: resolved.policy,
     auctionType: resolved.auctionType,
+  }
+}
+
+export const policyContextFromState = (state: Pick<GameState, 'config' | 'metadata'>): AuctionPolicyContext => {
+  const parsedYear = new Date(state.metadata.createdAt).getUTCFullYear()
+  const seasonYear = Number.isFinite(parsedYear) ? parsedYear : FALLBACK_SEASON_YEAR
+  return {
+    policySet: state.config.policySet,
+    seasonYear,
   }
 }

@@ -1,5 +1,5 @@
 import { SimInvariantError, ValidationError } from '@/domain/errors'
-import { resolveAuctionPolicy } from '@/domain/policy/resolver'
+import { policyContextFromState, resolveAuctionPolicy } from '@/domain/policy/resolver'
 import type { GameState, MatchResult } from '@/domain/types'
 
 export const assertTeamBudgets = (state: GameState) => {
@@ -22,7 +22,7 @@ export const assertRosterSizes = (state: GameState) => {
 }
 
 export const assertOverseasCap = (state: GameState) => {
-  const policy = resolveAuctionPolicy().policy
+  const policy = resolveAuctionPolicy(policyContextFromState(state)).policy
   const playersById = new Map(state.players.map((player) => [player.id, player]))
   for (const team of state.teams) {
     const overseasCount = team.rosterPlayerIds.filter((playerId) => playersById.get(playerId)?.countryTag !== 'IN').length
@@ -33,7 +33,7 @@ export const assertOverseasCap = (state: GameState) => {
 }
 
 export const assertMinimumSpend = (state: GameState) => {
-  const policy = resolveAuctionPolicy().policy
+  const policy = resolveAuctionPolicy(policyContextFromState(state)).policy
   if (!state.auction.complete) {
     return
   }

@@ -18,7 +18,7 @@ export const AuctionPage = () => {
   return (
     <section className="card">
       <h2>Auction</h2>
-      <p>Season 1 rules: open auction only, no RTM/retentions. Purse is ₹120 Cr per team with 18-25 squad size and max 8 overseas players.</p>
+      <p>Policy-aware auction rules are active for this season (mini/mega cycle, purse and RTM/retention controls).</p>
       <p>
         Phase: <strong>{state.auction.phase}</strong> | Sold: <strong>{soldCount}</strong> | Unsold: <strong>{unsoldCount}</strong>
       </p>

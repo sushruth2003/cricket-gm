@@ -8,7 +8,7 @@ export interface TeamSetupInput {
   bowlingPreset: 'balanced' | 'aggressive' | 'defensive'
 }
 
-export const updateUserTeamSetup = async (repository: GameRepository, input: TeamSetupInput): Promise<GameState> => {
+export const updateUserTeamSetup = async (repository: GameRepository, input: TeamSetupInput, leagueId?: string): Promise<GameState> => {
   return repository.transaction(async (current) => {
     if (!current) {
       throw new ValidationError('No league loaded')
@@ -39,5 +39,5 @@ export const updateUserTeamSetup = async (repository: GameRepository, input: Tea
       nextState: next,
       result: next,
     }
-  })
+  }, leagueId)
 }

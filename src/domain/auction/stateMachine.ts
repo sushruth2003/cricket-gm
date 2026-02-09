@@ -8,16 +8,67 @@ import type { AuctionPolicyContext, GameState, Player, ResolvedAuctionPolicy, Te
 
 export type UserAuctionAction = 'bid' | 'pass' | 'auto'
 
-const playerOverall = (player: Player) =>
-  Math.round((player.ratings.batting.overall + player.ratings.bowling.overall + player.ratings.fielding.overall) / 3)
+const isBowlingOption = (player: Player): boolean => {
+  return player.role === 'bowler' || player.role === 'allrounder' || player.ratings.bowling.overall >= 66
+}
 
-const teamIntentValue = (team: Team, player: Player, state: GameState) => {
-  const needFactor = team.rosterPlayerIds.length < 18 ? 160 : team.rosterPlayerIds.length < 22 ? 75 : 25
-  const balanceBoost =
-    player.role === 'wicketkeeper' && !team.rosterPlayerIds.some((playerId) => state.players.find((p) => p.id === playerId)?.role === 'wicketkeeper')
-      ? 60
-      : 0
-  return player.basePrice + playerOverall(player) * 2 + needFactor + balanceBoost
+const teamRoleCounts = (team: Team, state: GameState, resolvedPolicy: ResolvedAuctionPolicy) => {
+  const playerById = new Map(state.players.map((player) => [player.id, player]))
+  const rosterPlayers = team.rosterPlayerIds.map((playerId) => playerById.get(playerId)).filter((player) => Boolean(player))
+  const wicketkeeperCount = rosterPlayers.filter((player) => player?.role === 'wicketkeeper').length
+  const bowlingOptions = rosterPlayers.filter((player) => player && isBowlingOption(player)).length
+  const remainingSlots = Math.max(0, resolvedPolicy.policy.squadMax - team.rosterPlayerIds.length)
+  return {
+    wicketkeeperCount,
+    bowlingOptions,
+    remainingSlots,
+  }
+}
+
+const playerValueScore = (player: Player): number => {
+  const ratingsBlend =
+    player.ratings.batting.overall * 0.34 +
+    player.ratings.bowling.overall * 0.34 +
+    player.ratings.fielding.overall * 0.14 +
+    player.ratings.fitness * 0.09 +
+    player.ratings.temperament * 0.09
+
+  const roleMultiplier = player.role === 'allrounder' ? 1.08 : player.role === 'wicketkeeper' ? 1.03 : player.role === 'bowler' ? 1.01 : 0.97
+  const battingSignal = player.lastSeasonStats.runs / 24 + player.lastSeasonStats.strikeRate / 8
+  const bowlingSignal = player.lastSeasonStats.wickets * 3.8 + Math.max(0, 10 - player.lastSeasonStats.economy) * 4.8
+  const seasonSignal =
+    player.role === 'bowler'
+      ? battingSignal * 0.2 + bowlingSignal * 1.1
+      : player.role === 'allrounder'
+        ? battingSignal * 0.6 + bowlingSignal * 0.8
+        : player.role === 'wicketkeeper'
+          ? battingSignal * 0.85 + bowlingSignal * 0.15
+          : battingSignal * 1.05 + bowlingSignal * 0.1
+
+  return ratingsBlend * roleMultiplier * 2.05 + seasonSignal
+}
+
+const teamNeedScore = (team: Team, player: Player, state: GameState, resolvedPolicy: ResolvedAuctionPolicy): number => {
+  const counts = teamRoleCounts(team, state, resolvedPolicy)
+  const remainingBowlingGap = Math.max(0, 5 - counts.bowlingOptions)
+  const rosterUrgency = team.rosterPlayerIds.length < 18 ? 55 : team.rosterPlayerIds.length < 22 ? 32 : 14
+  const wicketkeeperScarcityBoost = counts.wicketkeeperCount === 0 && player.role === 'wicketkeeper' ? 130 : 0
+  const bowlingScarcityBoost = remainingBowlingGap > 0 && isBowlingOption(player) ? remainingBowlingGap * 27 : 0
+  const allrounderFlexBoost = remainingBowlingGap > 0 && player.role === 'allrounder' ? 18 : 0
+  const endgamePenalty = counts.remainingSlots <= 3 && !isBowlingOption(player) ? -18 : 0
+
+  return rosterUrgency + wicketkeeperScarcityBoost + bowlingScarcityBoost + allrounderFlexBoost + endgamePenalty
+}
+
+const maxBidForTeam = (team: Team, player: Player, state: GameState, resolvedPolicy: ResolvedAuctionPolicy): number => {
+  const counts = teamRoleCounts(team, state, resolvedPolicy)
+  const baseValue = player.basePrice + playerValueScore(player) + teamNeedScore(team, player, state, resolvedPolicy)
+  const reserveTarget = Math.max(1, counts.remainingSlots) * resolvedPolicy.policy.minimumPlayerBase
+  const budgetRatio = team.budgetRemaining / reserveTarget
+  const budgetPressureFactor = budgetRatio < 1 ? 0.72 : budgetRatio < 1.4 ? 0.82 : budgetRatio < 1.8 ? 0.9 : 0.98
+  const endgameFactor = counts.remainingSlots <= 3 ? 0.9 : 1
+  const cappedByBudget = Math.min(team.budgetRemaining, Math.round(baseValue * budgetPressureFactor * endgameFactor))
+  return Math.max(0, cappedByBudget)
 }
 
 const chooseAiBidder = (state: GameState, player: Player, nextBid: number, resolvedPolicy: ResolvedAuctionPolicy): Team | null => {
@@ -35,11 +86,12 @@ const chooseAiBidder = (state: GameState, player: Player, nextBid: number, resol
     .filter((team) => !state.auction.passedTeamIds.includes(team.id))
     .filter((team) => canTeamBid(state, indexes, team, player, nextBid, resolvedPolicy.policy))
     .map((team) => {
-      const value = teamIntentValue(team, player, state) + prng.nextInt(0, 35)
-      return { team, value }
+      const bidCeiling = maxBidForTeam(team, player, state, resolvedPolicy)
+      const confidenceNoise = prng.nextInt(-6, 8)
+      return { team, margin: bidCeiling - nextBid + confidenceNoise }
     })
-    .filter(({ value }) => value >= nextBid)
-    .sort((a, b) => b.value - a.value)
+    .filter(({ margin }) => margin >= 0)
+    .sort((a, b) => b.margin - a.margin)
 
   return candidates[0]?.team ?? null
 }
@@ -162,8 +214,8 @@ export const progressAuctionState = (state: GameState, userAction?: UserAuctionA
           continue
         }
 
-        const autoValue = teamIntentValue(userTeam, player, nextState)
-        if (autoValue >= nextBid) {
+        const autoBidCeiling = maxBidForTeam(userTeam, player, nextState, resolvedPolicy)
+        if (autoBidCeiling >= nextBid) {
           applyBid(nextState, nextState.userTeamId, nextBid)
         } else if (!nextState.auction.passedTeamIds.includes(nextState.userTeamId)) {
           nextState.auction.passedTeamIds.push(nextState.userTeamId)

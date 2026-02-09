@@ -4,7 +4,7 @@ import { advanceSeason } from '@/application/useCases/advanceSeason'
 import { createLeague } from '@/application/useCases/createLeague'
 import { exportSave } from '@/application/useCases/exportSave'
 import { importSave } from '@/application/useCases/importSave'
-import { progressAuctionForUser, runAuction } from '@/application/useCases/runAuction'
+import { progressAuctionForUser, runAuction, skipAuctionToPlayerForUser } from '@/application/useCases/runAuction'
 import { simulateNextFixture } from '@/application/useCases/simulateSeason'
 import { startSeason } from '@/application/useCases/startSeason'
 import { updateUserTeamSetup } from '@/application/useCases/updateUserTeamSetup'
@@ -25,6 +25,7 @@ export interface AppServices {
   auctionBid(leagueId?: string): Promise<GameState>
   auctionPass(leagueId?: string): Promise<GameState>
   auctionAuto(leagueId?: string): Promise<GameState>
+  auctionSkipToPlayer(playerId: string, leagueId?: string): Promise<GameState>
   startSeason(leagueId?: string): Promise<GameState>
   updateUserTeamSetup(input: {
     playingXi: string[]
@@ -81,6 +82,7 @@ export const createAppServices = async (): Promise<AppServices> => {
     auctionBid: (leagueId?: string) => progressAuctionForUser(repository, 'bid', leagueId),
     auctionPass: (leagueId?: string) => progressAuctionForUser(repository, 'pass', leagueId),
     auctionAuto: (leagueId?: string) => progressAuctionForUser(repository, 'auto', leagueId),
+    auctionSkipToPlayer: (playerId: string, leagueId?: string) => skipAuctionToPlayerForUser(repository, playerId, leagueId),
     startSeason: (leagueId?: string) => startSeason(repository, leagueId),
     updateUserTeamSetup: (input, leagueId?: string) => updateUserTeamSetup(repository, input, leagueId),
     simulateOneMatch: async (leagueId?: string) => {

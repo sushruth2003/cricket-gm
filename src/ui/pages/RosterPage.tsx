@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatCr } from '@/ui/format/currency'
 import { useApp } from '@/ui/useApp'
 import {
-  autosortDraftOrder,
+  buildCompositeAutoLineup,
   buildInitialDraftOrder,
   movePlayerInOrder,
   resolveActiveWicketkeeper,
@@ -203,14 +203,13 @@ export const RosterPage = () => {
   const sortMarker = (column: SortKey) => (sortBy === column ? (sortDirection === 'asc' ? '▲' : '▼') : '▵')
 
   const onAutoSort = () => {
-    const nextOrder = autosortDraftOrder(rosterPlayers, sortBy, sortDirection)
-    const nextXi = nextOrder.slice(0, Math.min(STARTING_XI_SIZE, nextOrder.length))
+    const { draftOrder: nextOrder, wicketkeeperPlayerId } = buildCompositeAutoLineup(rosterPlayers)
 
     setDraftOrderByTeam((current) => ({
       ...current,
       [userTeam.id]: nextOrder,
     }))
-    setTeamWicketkeeper(selectedWicketkeeper && nextXi.includes(selectedWicketkeeper) ? selectedWicketkeeper : null)
+    setTeamWicketkeeper(wicketkeeperPlayerId)
   }
 
   const onDropOnRow = (targetIndex: number) => {
@@ -277,7 +276,7 @@ export const RosterPage = () => {
           </label>
 
           <button type="button" onClick={onAutoSort} disabled={rosterPlayers.length === 0}>
-            Auto Sort ({toLabel(sortBy)} {sortDirection === 'asc' ? 'Asc' : 'Desc'})
+            Auto Pick XI (Composite)
           </button>
           <p className="teamHint">Drag handles to reorder lineup. Team setup auto-saves when your XI is valid.</p>
         </div>

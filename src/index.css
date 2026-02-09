@@ -68,6 +68,22 @@ input {
   padding: 1.2rem;
 }
 
+.phaseToolbar {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  background: linear-gradient(125deg, #f6fbff, #edf6ff);
+}
+
+.phaseSub {
+  margin: 0.25rem 0 0;
+  color: #334155;
+}
+
 .banner {
   margin-bottom: 1rem;
   background: #fef3c7;

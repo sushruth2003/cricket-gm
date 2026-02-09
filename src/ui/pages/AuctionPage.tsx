@@ -1,3 +1,4 @@
+import { Navigate } from 'react-router-dom'
 import { formatCr } from '@/ui/format/currency'
 import { useApp } from '@/ui/useApp'
 
@@ -10,6 +11,9 @@ export const AuctionPage = () => {
 
   if (!state) {
     return <p className="card">Create a league first.</p>
+  }
+  if (state.phase === 'preseason' && state.auction.complete) {
+    return <Navigate to="/roster" replace />
   }
 
   const soldCount = views.auctionEntries.filter((entry) => entry.status === 'sold').length

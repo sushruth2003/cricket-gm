@@ -63,6 +63,7 @@ export const FixturesPage = () => {
   if (!state) {
     return <p className="card">Create a league first.</p>
   }
+  const canSimulate = state.phase === 'regular-season' || state.phase === 'playoffs'
 
   return (
     <section className="card">
@@ -84,10 +85,10 @@ export const FixturesPage = () => {
         </div>
       </div>
       <div className="actions">
-        <button onClick={() => actions.simulateMatch()} disabled={state.phase === 'auction'}>
+        <button onClick={() => actions.simulateMatch()} disabled={!canSimulate}>
           Sim Next Date
         </button>
-        <button onClick={() => actions.simulateSeason()} disabled={state.phase === 'auction' || state.phase === 'complete'}>
+        <button onClick={() => actions.simulateSeason()} disabled={!canSimulate}>
           Sim Remaining
         </button>
       </div>

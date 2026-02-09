@@ -1,13 +1,11 @@
 import { createLeague } from '@/application/useCases/createLeague'
-import { runAuction } from '@/application/useCases/runAuction'
 import { updateUserTeamSetup } from '@/application/useCases/updateUserTeamSetup'
 import { MemoryRepository } from '@/test/memoryRepository'
 
 describe('updateUserTeamSetup', () => {
   it('saves designated wicketkeeper when part of XI', async () => {
     const repo = new MemoryRepository()
-    let state = await createLeague(repo, 111)
-    state = await runAuction(repo)
+    const state = await createLeague(repo, 111)
 
     const team = state.teams.find((candidate) => candidate.id === state.userTeamId)
     expect(team).toBeDefined()
@@ -29,8 +27,7 @@ describe('updateUserTeamSetup', () => {
 
   it('rejects wicketkeeper outside selected XI', async () => {
     const repo = new MemoryRepository()
-    let state = await createLeague(repo, 222)
-    state = await runAuction(repo)
+    const state = await createLeague(repo, 222)
 
     const team = state.teams.find((candidate) => candidate.id === state.userTeamId)
     expect(team).toBeDefined()
@@ -55,8 +52,7 @@ describe('updateUserTeamSetup', () => {
 
   it('preserves submitted XI batting order', async () => {
     const repo = new MemoryRepository()
-    let state = await createLeague(repo, 333)
-    state = await runAuction(repo)
+    const state = await createLeague(repo, 333)
 
     const team = state.teams.find((candidate) => candidate.id === state.userTeamId)
     expect(team).toBeDefined()

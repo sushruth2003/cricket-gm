@@ -155,7 +155,7 @@ export const RosterPage = () => {
   ])
 
   if (!state || !userTeam) {
-    return <p className="card">Create a league and complete auction first.</p>
+    return <p className="card">Create a league first.</p>
   }
 
   const setTeamDraftOrder = (updater: (current: string[]) => string[]) => {

@@ -1,6 +1,7 @@
 import { applyMatchToStats } from '@/domain/stats'
 import { simulateMatch } from '@/domain/matchSim'
 import { assertGameStateSemanticIntegrity } from '@/domain/invariants'
+import { ValidationError } from '@/domain/errors'
 import { getFixtureDateKey, getRoundDateKey } from '@/domain/schedule'
 import type { GameState, MatchResult, Team } from '@/domain/types'
 
@@ -231,6 +232,10 @@ export interface SimulateOneMatchResult {
 }
 
 export const simulateNextFixture = (state: GameState): SimulateOneMatchResult => {
+  if (state.phase === 'auction' || state.phase === 'preseason') {
+    throw new ValidationError('Season simulation is unavailable before regular season starts')
+  }
+
   const nextState = structuredClone(state)
   advanceTournamentIfNeeded(nextState)
   const nextScheduledDate = getNextScheduledDate(nextState)

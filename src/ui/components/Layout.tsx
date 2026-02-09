@@ -12,13 +12,17 @@ const links = [
 ]
 
 export const Layout = () => {
-  const { saving, progressText } = useApp()
+  const { saving, progressText, leagues, activeLeagueId, switchingLeague } = useApp()
+  const activeLeague = leagues.find((league) => league.id === activeLeagueId)
 
   return (
     <div className="layout">
       <aside className="sidebar">
         <h1>Cricket GM</h1>
         <p className="caption">Fictional Franchise Sim</p>
+        <p className="caption">
+          League: {switchingLeague ? 'Switching...' : activeLeague?.name ?? (activeLeagueId ? activeLeagueId : 'None')}
+        </p>
         <nav>
           {links.map((link) => (
             <NavLink key={link.to} to={link.to} className={({ isActive }) => (isActive ? 'active' : '')} end={link.to === '/'}>

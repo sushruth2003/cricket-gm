@@ -5,22 +5,31 @@ import type { toMatchView } from '@/application/mappers/matchMapper'
 import type { toPlayerView } from '@/application/mappers/playerMapper'
 import type { toStatView } from '@/application/mappers/statsMapper'
 import type { toTeamView } from '@/application/mappers/teamMapper'
+import type { LeagueSummary } from '@/application/services'
 import type { GameState } from '@/domain/types'
 
 export interface AppContextValue {
   services: AppServices
+  leagues: LeagueSummary[]
+  activeLeagueId: string | null
   state: GameState | null
   loading: boolean
+  switchingLeague: boolean
   saving: boolean
   progressText: string
+  errorMessage: string | null
   actions: {
     createOrLoadLeague: () => Promise<void>
+    createLeague: (input?: { id?: string; name?: string; seed?: number }) => Promise<void>
+    selectLeague: (leagueId: string) => Promise<void>
+    loadLeagues: () => Promise<void>
     runAuction: () => Promise<void>
     auctionBid: () => Promise<void>
     auctionPass: () => Promise<void>
     auctionAuto: () => Promise<void>
     simulateMatch: () => Promise<void>
     simulateSeason: () => Promise<void>
+    advanceSeason?: () => Promise<void>
     updateTeamSetup: (input: {
       playingXi: string[]
       wicketkeeperPlayerId: string

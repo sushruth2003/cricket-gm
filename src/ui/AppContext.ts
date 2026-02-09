@@ -16,6 +16,9 @@ export interface AppContextValue {
   actions: {
     createOrLoadLeague: () => Promise<void>
     runAuction: () => Promise<void>
+    auctionBid: () => Promise<void>
+    auctionPass: () => Promise<void>
+    auctionAuto: () => Promise<void>
     simulateMatch: () => Promise<void>
     simulateSeason: () => Promise<void>
     updateTeamSetup: (input: {

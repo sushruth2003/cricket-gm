@@ -47,6 +47,29 @@ const normalizeBowlingStyle = (value: unknown): 'pace' | 'spin' | null => {
   return null
 }
 
+const normalizeAuctionPhase = (
+  value: unknown,
+): 'marquee' | 'capped' | 'uncapped' | 'accelerated-1' | 'accelerated-2' | 'complete' => {
+  if (
+    value === 'marquee' ||
+    value === 'capped' ||
+    value === 'uncapped' ||
+    value === 'accelerated-1' ||
+    value === 'accelerated-2' ||
+    value === 'complete'
+  ) {
+    return value
+  }
+  return 'capped'
+}
+
+const normalizeAuctionStatus = (value: unknown): 'pending' | 'sold' | 'unsold' => {
+  if (value === 'pending' || value === 'sold' || value === 'unsold') {
+    return value
+  }
+  return 'pending'
+}
+
 const repairLegacySave = (raw: unknown): unknown => {
   const root =
     raw &&
@@ -113,6 +136,7 @@ const repairLegacySave = (raw: unknown): unknown => {
       firstName: asString(player.firstName, 'Player'),
       lastName: asString(player.lastName, String(index + 1)),
       countryTag: asString(player.countryTag, 'IN'),
+      capped: asBoolean(player.capped, true),
       role: inferredRole,
       basePrice: Math.max(1, asInteger(player.basePrice, 10)),
       ratings: {
@@ -298,15 +322,34 @@ const repairLegacySave = (raw: unknown): unknown => {
 
   const auction = mutable.auction && typeof mutable.auction === 'object' ? (mutable.auction as Record<string, unknown>) : {}
   const auctionEntries = Array.isArray(auction.entries) ? auction.entries : []
-  const fallbackEntries = normalizedPlayers.map((player) => ({ playerId: player.id, soldToTeamId: null, finalPrice: 0 }))
+  const fallbackEntries = normalizedPlayers.map((player) => ({
+    playerId: player.id,
+    phase: 'capped',
+    status: 'pending',
+    soldToTeamId: null,
+    finalPrice: 0,
+  }))
   mutable.auction = {
     currentNominationIndex: Math.max(0, asInteger(auction.currentNominationIndex, 0)),
+    phase: normalizeAuctionPhase(auction.phase),
+    currentPlayerId: asNullableString(auction.currentPlayerId),
+    currentBidTeamId: asNullableString(auction.currentBidTeamId),
+    currentBid: Math.max(0, asInteger(auction.currentBid, 0)),
+    currentBidIncrement: Math.max(0, asInteger(auction.currentBidIncrement, 0)),
+    passedTeamIds: Array.isArray(auction.passedTeamIds)
+      ? auction.passedTeamIds.map((candidate) => asString(candidate, '')).filter((teamId) => teamId.length > 0)
+      : [],
+    awaitingUserAction: asBoolean(auction.awaitingUserAction, true),
+    message: asString(auction.message, ''),
+    allowRtm: asBoolean(auction.allowRtm, false),
     entries:
       auctionEntries.length > 0
         ? auctionEntries.map((entryCandidate) => {
             const entry = entryCandidate && typeof entryCandidate === 'object' ? (entryCandidate as Record<string, unknown>) : {}
             return {
               playerId: asString(entry.playerId, ''),
+              phase: normalizeAuctionPhase(entry.phase),
+              status: normalizeAuctionStatus(entry.status),
               soldToTeamId: asNullableString(entry.soldToTeamId),
               finalPrice: Math.max(0, asInteger(entry.finalPrice, 0)),
             }

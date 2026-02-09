@@ -21,7 +21,7 @@ describe('application integration flow', () => {
     await repo.save(state)
     const loaded = await repo.load()
 
-    expect(loaded?.fixtures.filter((match) => match.played)).toHaveLength(3)
+    expect(loaded?.fixtures.filter((match) => match.played)).toHaveLength(15)
   })
 
   it('rolls back state on import schema failure', async () => {
@@ -32,5 +32,19 @@ describe('application integration flow', () => {
 
     const after = await repo.load()
     expect(after?.metadata.seed).toBe(existing.metadata.seed)
+  })
+
+  it('simulates all matches on the next scheduled date', async () => {
+    const repo = new MemoryRepository()
+    let state = await createLeague(repo, 2027)
+    state = await runAuction(repo)
+
+    const result = simulateNextFixture(state)
+    const played = result.nextState.fixtures.filter((fixture) => fixture.played)
+    const firstDate = played[0]?.scheduledAt
+
+    expect(firstDate).toBeTruthy()
+    expect(played).toHaveLength(state.teams.length / 2)
+    expect(played.every((fixture) => fixture.scheduledAt === firstDate)).toBe(true)
   })
 })

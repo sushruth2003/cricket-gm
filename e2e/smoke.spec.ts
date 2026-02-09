@@ -6,5 +6,5 @@ test('can create league and navigate core views', async ({ page }) => {
 
   await expect(page.getByText('Season Status')).toBeVisible()
   await page.getByRole('link', { name: 'Auction' }).click()
-  await expect(page.getByRole('button', { name: 'Run Auto Auction' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Auto Complete Auction' })).toBeVisible()
 })

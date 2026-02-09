@@ -38,6 +38,7 @@ const playerSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
   countryTag: z.string(),
+  capped: z.boolean(),
   role: z.enum(['batter', 'bowler', 'wicketkeeper', 'allrounder']),
   basePrice: z.number().int().min(1),
   ratings: z.object({
@@ -101,6 +102,7 @@ const matchSchema = z.object({
   awayTeamId: z.string(),
   venue: z.string(),
   round: z.number().int().min(1),
+  scheduledAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   played: z.boolean(),
   winnerTeamId: z.string().nullable(),
   margin: z.string(),
@@ -133,9 +135,20 @@ export const gameSaveSchema = z.object({
   players: z.array(playerSchema),
   auction: z.object({
     currentNominationIndex: z.number().int().min(0),
+    phase: z.enum(['marquee', 'capped', 'uncapped', 'accelerated-1', 'accelerated-2', 'complete']),
+    currentPlayerId: z.string().nullable(),
+    currentBidTeamId: z.string().nullable(),
+    currentBid: z.number().int().min(0),
+    currentBidIncrement: z.number().int().min(0),
+    passedTeamIds: z.array(z.string()),
+    awaitingUserAction: z.boolean(),
+    message: z.string(),
+    allowRtm: z.boolean(),
     entries: z.array(
       z.object({
         playerId: z.string(),
+        phase: z.enum(['marquee', 'capped', 'uncapped', 'accelerated-1', 'accelerated-2', 'complete']),
+        status: z.enum(['pending', 'sold', 'unsold']),
         soldToTeamId: z.string().nullable(),
         finalPrice: z.number().int().min(0),
       }),

@@ -1,5 +1,6 @@
 import { createPrng } from '@/domain/prng'
 import type {
+  AuctionPhase,
   BattingTrait,
   BowlingStyle,
   BowlingTrait,
@@ -31,7 +32,15 @@ const brandPool = ['Strikers', 'Falcons', 'Chargers', 'Gladiators', 'Mariners', 
 const countryTags = [
   'IN',
   'IN',
-  'PK',
+  'IN',
+  'IN',
+  'IN',
+  'IN',
+  'IN',
+  'IN',
+  'IN',
+  'IN',
+  'IN',
   'BD',
   'SL',
   'AFG',
@@ -40,10 +49,6 @@ const countryTags = [
   'ENG',
   'SA',
   'WI',
-  'IRE',
-  'NED',
-  'USA',
-  'ZIM',
 ]
 const firstNames = [
   'Aariv',
@@ -90,6 +95,7 @@ const lastNames = [
   'Reid',
 ]
 const colors = ['#0b1f3a', '#9d1d20', '#1f6f8b', '#f4a300', '#2f5233', '#702963', '#4b6cb7', '#7b241c', '#2e4053', '#0e6655']
+const basePriceTiers = [200, 150, 125, 100, 75, 50, 40, 30]
 
 const clamp = (value: number, min = 20, max = 99) => Math.max(min, Math.min(max, value))
 
@@ -232,16 +238,60 @@ export const generatePlayers = (config: LeagueConfig): Player[] => {
       )
     }
 
+    const countryTag = prng.pick(countryTags)
+    const isIndian = countryTag === 'IN'
+    const capped = !isIndian || prng.next() > 0.45
+
     return {
       id: `player-${index + 1}`,
       firstName: prng.pick(firstNames),
       lastName: prng.pick(lastNames),
-      countryTag: prng.pick(countryTags),
+      countryTag,
+      capped,
       role,
-      basePrice: prng.nextInt(8, 60),
+      basePrice: prng.pick(basePriceTiers),
       ratings,
       teamId: null,
     }
+  })
+}
+
+const playerOverall = (player: Player) =>
+  Math.round((player.ratings.batting.overall + player.ratings.bowling.overall + player.ratings.fielding.overall) / 3)
+
+const orderPlayersForAuction = (players: Player[]): Array<{ playerId: string; phase: AuctionPhase }> => {
+  const byOverall = [...players].sort((a, b) => playerOverall(b) - playerOverall(a))
+  const marquee = new Set(byOverall.slice(0, Math.min(16, byOverall.length)).map((player) => player.id))
+
+  const withRoleWeight = (list: Player[], role: Player['role'], bowlingStyle?: BowlingStyle) =>
+    list
+      .filter((player) => player.role === role)
+      .filter((player) => !bowlingStyle || player.ratings.bowling.style === bowlingStyle)
+      .sort((a, b) => playerOverall(b) - playerOverall(a))
+
+  const remaining = players.filter((player) => !marquee.has(player.id))
+  const capped = remaining.filter((player) => player.capped)
+  const uncapped = remaining.filter((player) => !player.capped && player.countryTag === 'IN')
+
+  const ordered = [
+    ...byOverall.filter((player) => marquee.has(player.id)).map((player) => ({ player, phase: 'marquee' as const })),
+    ...withRoleWeight(capped, 'batter').map((player) => ({ player, phase: 'capped' as const })),
+    ...withRoleWeight(capped, 'allrounder').map((player) => ({ player, phase: 'capped' as const })),
+    ...withRoleWeight(capped, 'wicketkeeper').map((player) => ({ player, phase: 'capped' as const })),
+    ...withRoleWeight(capped, 'bowler', 'pace').map((player) => ({ player, phase: 'capped' as const })),
+    ...withRoleWeight(capped, 'bowler', 'spin').map((player) => ({ player, phase: 'capped' as const })),
+    ...withRoleWeight(uncapped, 'batter').map((player) => ({ player, phase: 'uncapped' as const })),
+    ...withRoleWeight(uncapped, 'allrounder').map((player) => ({ player, phase: 'uncapped' as const })),
+    ...withRoleWeight(uncapped, 'wicketkeeper').map((player) => ({ player, phase: 'uncapped' as const })),
+    ...withRoleWeight(uncapped, 'bowler', 'pace').map((player) => ({ player, phase: 'uncapped' as const })),
+    ...withRoleWeight(uncapped, 'bowler', 'spin').map((player) => ({ player, phase: 'uncapped' as const })),
+  ]
+
+  return ordered.map((item, index) => {
+    if (index >= 75) {
+      return { playerId: item.player.id, phase: index >= 150 ? 'accelerated-2' : 'accelerated-1' }
+    }
+    return { playerId: item.player.id, phase: item.phase }
   })
 }
 
@@ -249,14 +299,17 @@ export const createInitialState = (seed: number): GameState => {
   const config: LeagueConfig = {
     teamCount: 10,
     format: 'T20',
-    auctionBudget: 1_500,
-    minSquadSize: 20,
+    auctionBudget: 12_000,
+    minSquadSize: 18,
     maxSquadSize: 25,
     seasonSeed: seed,
   }
 
   const teams = generateTeams(config)
   const players = generatePlayers(config)
+  const entries = orderPlayersForAuction(players)
+  const firstPlayerId = entries[0]?.playerId ?? null
+  const firstPlayerBase = players.find((player) => player.id === firstPlayerId)?.basePrice ?? 0
 
   return {
     metadata: {
@@ -277,7 +330,22 @@ export const createInitialState = (seed: number): GameState => {
     players,
     auction: {
       currentNominationIndex: 0,
-      entries: players.map((player) => ({ playerId: player.id, soldToTeamId: null, finalPrice: 0 })),
+      phase: entries[0]?.phase ?? 'complete',
+      currentPlayerId: firstPlayerId,
+      currentBidTeamId: null,
+      currentBid: 0,
+      currentBidIncrement: firstPlayerBase,
+      passedTeamIds: [],
+      awaitingUserAction: true,
+      message: 'Free-for-all opening auction (Season 1): no RTM or retention rights.',
+      allowRtm: false,
+      entries: entries.map((entry) => ({
+        playerId: entry.playerId,
+        phase: entry.phase,
+        status: 'pending',
+        soldToTeamId: null,
+        finalPrice: 0,
+      })),
       complete: false,
     },
     fixtures: [],

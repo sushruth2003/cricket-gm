@@ -11,8 +11,33 @@ export const assertTeamBudgets = (state: GameState) => {
 
 export const assertRosterSizes = (state: GameState) => {
   for (const team of state.teams) {
+    if (state.auction.complete && team.rosterPlayerIds.length < state.config.minSquadSize) {
+      throw new ValidationError(`Team ${team.name} below minimum squad size`)
+    }
     if (team.rosterPlayerIds.length > state.config.maxSquadSize) {
       throw new ValidationError(`Team ${team.name} exceeds max squad size`)
+    }
+  }
+}
+
+export const assertOverseasCap = (state: GameState) => {
+  const playersById = new Map(state.players.map((player) => [player.id, player]))
+  for (const team of state.teams) {
+    const overseasCount = team.rosterPlayerIds.filter((playerId) => playersById.get(playerId)?.countryTag !== 'IN').length
+    if (overseasCount > 8) {
+      throw new ValidationError(`Team ${team.name} exceeds overseas player cap`)
+    }
+  }
+}
+
+export const assertMinimumSpend = (state: GameState) => {
+  if (!state.auction.complete) {
+    return
+  }
+  for (const team of state.teams) {
+    const spent = state.config.auctionBudget - team.budgetRemaining
+    if (spent < 9_000) {
+      throw new ValidationError(`Team ${team.name} failed minimum spend requirement`)
     }
   }
 }
@@ -61,8 +86,13 @@ export const assertGameStateSemanticIntegrity = (state: GameState) => {
 
   assertTeamBudgets(state)
   assertRosterSizes(state)
+  assertOverseasCap(state)
+  assertMinimumSpend(state)
 
   for (const match of state.fixtures) {
+    if (match.scheduledAt && Number.isNaN(Date.parse(match.scheduledAt))) {
+      throw new ValidationError('Fixture scheduled date is invalid', { matchId: match.id, scheduledAt: match.scheduledAt })
+    }
     assertScorecardIntegrity(match)
   }
 }

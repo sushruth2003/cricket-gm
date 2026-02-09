@@ -2,7 +2,7 @@ import type { GameRepository } from '@/application/gameRepository'
 import { createLeague } from '@/application/useCases/createLeague'
 import { exportSave } from '@/application/useCases/exportSave'
 import { importSave } from '@/application/useCases/importSave'
-import { runAuction } from '@/application/useCases/runAuction'
+import { progressAuctionForUser, runAuction } from '@/application/useCases/runAuction'
 import { simulateNextFixture } from '@/application/useCases/simulateSeason'
 import { updateUserTeamSetup } from '@/application/useCases/updateUserTeamSetup'
 import type { GameState } from '@/domain/types'
@@ -15,6 +15,9 @@ export interface AppServices {
   getState(): Promise<GameState | null>
   initialize(seed?: number): Promise<GameState>
   runAuction(): Promise<GameState>
+  auctionBid(): Promise<GameState>
+  auctionPass(): Promise<GameState>
+  auctionAuto(): Promise<GameState>
   updateUserTeamSetup(input: {
     playingXi: string[]
     wicketkeeperPlayerId: string
@@ -50,6 +53,9 @@ export const createAppServices = async (): Promise<AppServices> => {
       return createLeague(repository, seed)
     },
     runAuction: () => runAuction(repository),
+    auctionBid: () => progressAuctionForUser(repository, 'bid'),
+    auctionPass: () => progressAuctionForUser(repository, 'pass'),
+    auctionAuto: () => progressAuctionForUser(repository, 'auto'),
     updateUserTeamSetup: (input) => updateUserTeamSetup(repository, input),
     simulateOneMatch: async () => {
       const state = await repository.load()
@@ -81,7 +87,10 @@ export const createAppServices = async (): Promise<AppServices> => {
 
         worker.onmessage = async (event) => {
           const message = event.data as
-            | { type: 'progress'; payload: { state: GameState; completedMatches: number; totalMatches: number } }
+            | {
+                type: 'progress'
+                payload: { state: GameState; completedMatches: number; totalMatches: number; simulatedDate: string | null }
+              }
             | { type: 'complete'; payload: { state: GameState } }
             | { type: 'cancelled'; payload: { state: GameState } }
 

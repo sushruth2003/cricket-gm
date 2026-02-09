@@ -13,7 +13,7 @@ export const FixturesPage = () => {
       <h2>Fixtures</h2>
       <div className="actions">
         <button onClick={() => actions.simulateMatch()} disabled={state.phase === 'auction'}>
-          Sim Next
+          Sim Next Date
         </button>
         <button onClick={() => actions.simulateSeason()} disabled={state.phase === 'auction' || state.phase === 'complete'}>
           Sim Remaining
@@ -24,6 +24,7 @@ export const FixturesPage = () => {
           <thead>
             <tr>
               <th>Round</th>
+              <th>Date</th>
               <th>Home</th>
               <th>Away</th>
               <th>Status</th>
@@ -34,6 +35,7 @@ export const FixturesPage = () => {
             {views.matches.map((match) => (
               <tr key={match.id}>
                 <td>{match.round}</td>
+                <td>{match.scheduledAt ?? 'TBD'}</td>
                 <td>{state.teams.find((team) => team.id === match.homeTeamId)?.shortName}</td>
                 <td>{state.teams.find((team) => team.id === match.awayTeamId)?.shortName}</td>
                 <td>{match.played ? match.margin : 'Pending'}</td>

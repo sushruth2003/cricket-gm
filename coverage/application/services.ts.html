@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/52</span>
+                <span class='fraction'>0/55</span>
             </div>
         
             
@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/15</span>
+                <span class='fraction'>0/18</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/52</span>
+                <span class='fraction'>0/55</span>
             </div>
         
             
@@ -180,7 +180,21 @@
 <a name='L115'></a><a href='#L115'>115</a>
 <a name='L116'></a><a href='#L116'>116</a>
 <a name='L117'></a><a href='#L117'>117</a>
-<a name='L118'></a><a href='#L118'>118</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -232,7 +246,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -241,7 +254,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -249,19 +261,27 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -301,7 +321,7 @@
 import { createLeague } from '@/application/useCases/createLeague'
 import { exportSave } from '@/application/useCases/exportSave'
 import { importSave } from '@/application/useCases/importSave'
-import { runAuction } from '@/application/useCases/runAuction'
+import { progressAuctionForUser, runAuction } from '@/application/useCases/runAuction'
 import { simulateNextFixture } from '@/application/useCases/simulateSeason'
 import { updateUserTeamSetup } from '@/application/useCases/updateUserTeamSetup'
 import type { GameState } from '@/domain/types'
@@ -314,8 +334,12 @@ export interface AppServices {
   getState(): Promise&lt;GameState | null&gt;
   initialize(seed?: number): Promise&lt;GameState&gt;
   runAuction(): Promise&lt;GameState&gt;
+  auctionBid(): Promise&lt;GameState&gt;
+  auctionPass(): Promise&lt;GameState&gt;
+  auctionAuto(): Promise&lt;GameState&gt;
   updateUserTeamSetup(input: {
     playingXi: string[]
+    wicketkeeperPlayerId: string
     bowlingPreset: 'balanced' | 'aggressive' | 'defensive'
   }): Promise&lt;GameState&gt;
   simulateOneMatch(): Promise&lt;GameState&gt;
@@ -348,6 +372,9 @@ export const createAppServices = <span class="cstat-no" title="statement not cov
 <span class="cstat-no" title="statement not covered" >      return createLeague(repository, seed)</span>
     },
     runAuction: <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >() =&gt; r</span>unAuction(repository),</span>
+    auctionBid: <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >() =&gt; p</span>rogressAuctionForUser(repository, 'bid'),</span>
+    auctionPass: <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >() =&gt; p</span>rogressAuctionForUser(repository, 'pass'),</span>
+    auctionAuto: <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >() =&gt; p</span>rogressAuctionForUser(repository, 'auto'),</span>
     updateUserTeamSetup: <span class="fstat-no" title="function not covered" >(<span class="cstat-no" title="statement not covered" >i</span>nput) =&gt; updateUserTeamSetup(repository, input),</span>
     simulateOneMatch: <span class="fstat-no" title="function not covered" >async () =&gt; {</span>
       const state = <span class="cstat-no" title="statement not covered" >await repository.load()</span>
@@ -379,7 +406,10 @@ export const createAppServices = <span class="cstat-no" title="statement not cov
 &nbsp;
 <span class="cstat-no" title="statement not covered" >        worker.onmessage = <span class="fstat-no" title="function not covered" >async (e</span>vent) =&gt; {</span>
           const message = <span class="cstat-no" title="statement not covered" >event.data as</span>
-            | { type: 'progress'; payload: { state: GameState; completedMatches: number; totalMatches: number } }
+            | {
+                type: 'progress'
+                payload: { state: GameState; completedMatches: number; totalMatches: number; simulatedDate: string | null }
+              }
             | { type: 'complete'; payload: { state: GameState } }
             | { type: 'cancelled'; payload: { state: GameState } }
 &nbsp;
@@ -421,7 +451,7 @@ export const createAppServices = <span class="cstat-no" title="statement not cov
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-02-08T23:34:48.294Z
+                at 2026-02-09T00:13:43.087Z
             </div>
         <script src="../prettify.js"></script>
         <script>

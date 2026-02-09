@@ -26,24 +26,23 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
 
   cancelled = false
   let state = event.data.payload.state
-  const totalMatches = state.fixtures.length
   let completedMatches = state.fixtures.filter((match) => match.played).length
 
   while (!cancelled) {
-    const { nextState, playedMatch } = simulateNextFixture(state)
+    const { nextState, playedMatches, simulatedDate } = simulateNextFixture(state)
     state = nextState
 
-    if (!playedMatch) {
+    if (playedMatches.length === 0) {
       break
     }
 
-    completedMatches += 1
+    completedMatches += playedMatches.length
     self.postMessage({
       type: 'progress',
       payload: {
         completedMatches,
-        totalMatches,
-        latestMatchId: playedMatch.id,
+        totalMatches: state.fixtures.length,
+        simulatedDate,
         state,
       },
     })
@@ -54,7 +53,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     payload: {
       state,
       completedMatches,
-      totalMatches,
+      totalMatches: state.fixtures.length,
     },
   })
 }

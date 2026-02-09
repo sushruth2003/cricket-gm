@@ -61,6 +61,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       runAuction: async () => {
         await mutation.mutateAsync(async () => services.runAuction())
       },
+      auctionBid: async () => {
+        await mutation.mutateAsync(async () => services.auctionBid())
+      },
+      auctionPass: async () => {
+        await mutation.mutateAsync(async () => services.auctionPass())
+      },
+      auctionAuto: async () => {
+        await mutation.mutateAsync(async () => services.auctionAuto())
+      },
       simulateMatch: async () => {
         await mutation.mutateAsync(async () => services.simulateOneMatch())
       },

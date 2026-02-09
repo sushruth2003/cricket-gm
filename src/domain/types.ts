@@ -1,4 +1,6 @@
 export type Phase = 'auction' | 'regular-season' | 'playoffs' | 'complete'
+export type AuctionPhase = 'marquee' | 'capped' | 'uncapped' | 'accelerated-1' | 'accelerated-2' | 'complete'
+export type AuctionEntryStatus = 'pending' | 'sold' | 'unsold'
 
 export type BowlingStyle = 'pace' | 'spin'
 export type PlayerRole = 'batter' | 'bowler' | 'wicketkeeper' | 'allrounder'
@@ -65,6 +67,7 @@ export interface Player {
   firstName: string
   lastName: string
   countryTag: string
+  capped: boolean
   role: PlayerRole
   basePrice: number
   ratings: PlayerRatings
@@ -73,12 +76,23 @@ export interface Player {
 
 export interface AuctionEntry {
   playerId: string
+  phase: AuctionPhase
+  status: AuctionEntryStatus
   soldToTeamId: string | null
   finalPrice: number
 }
 
 export interface AuctionState {
   currentNominationIndex: number
+  phase: AuctionPhase
+  currentPlayerId: string | null
+  currentBidTeamId: string | null
+  currentBid: number
+  currentBidIncrement: number
+  passedTeamIds: string[]
+  awaitingUserAction: boolean
+  message: string
+  allowRtm: boolean
   entries: AuctionEntry[]
   complete: boolean
 }
@@ -116,6 +130,7 @@ export interface MatchResult {
   awayTeamId: string
   venue: string
   round: number
+  scheduledAt?: string
   played: boolean
   winnerTeamId: string | null
   margin: string

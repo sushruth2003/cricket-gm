@@ -1,11 +1,16 @@
-import { gameSaveSchema } from '@/application/contracts'
+import { gameSaveRootV3Schema, gameStateSchema } from '@/application/contracts'
 import type { GameRepository } from '@/application/gameRepository'
-import type { GameState } from '@/domain/types'
+import type { GameSaveRoot, GameState, LeagueSave } from '@/domain/types'
 import { buildSeasonSummary, SeasonSummaryStore } from '@/infrastructure/repository/seasonSummaryStore'
 import type { SqliteStore } from '@/infrastructure/repository/sqliteStore'
 
 const SAVE_ID = 'primary'
 const ENGINE_VERSION = '0.2.0'
+const ROOT_SCHEMA_VERSION = 3
+const DEFAULT_LEAGUE_ID = 'league-primary'
+const DEFAULT_LEAGUE_NAME = 'League 1'
+const DEFAULT_SEASON_ID = 'season-1'
+const DEFAULT_SEASON_NAME = 'Season 1'
 
 const clamp = (value: number, min = 1, max = 99): number => Math.max(min, Math.min(max, value))
 
@@ -389,6 +394,42 @@ const repairLegacySave = (raw: unknown): unknown => {
   return mutable
 }
 
+const buildLeagueSave = (state: GameState, leagueId: string, leagueName: string, nowIso: string): LeagueSave => ({
+  id: leagueId,
+  name: leagueName,
+  activeSeasonId: DEFAULT_SEASON_ID,
+  seasons: {
+    [DEFAULT_SEASON_ID]: {
+      id: DEFAULT_SEASON_ID,
+      name: DEFAULT_SEASON_NAME,
+      state: structuredClone(state),
+      createdAt: asIsoDateString(state.metadata.createdAt, nowIso),
+      updatedAt: asIsoDateString(state.metadata.updatedAt, nowIso),
+    },
+  },
+  createdAt: nowIso,
+  updatedAt: nowIso,
+})
+
+const buildRootFromState = (state: GameState, leagueId = DEFAULT_LEAGUE_ID): GameSaveRoot => {
+  const nowIso = new Date().toISOString()
+  const createdAt = asIsoDateString(state.metadata.createdAt, nowIso)
+  const updatedAt = asIsoDateString(state.metadata.updatedAt, nowIso)
+  return {
+    metadata: {
+      schemaVersion: ROOT_SCHEMA_VERSION,
+      engineVersion: asString(state.metadata.engineVersion, ENGINE_VERSION),
+      seed: asInteger(state.metadata.seed, Date.now() % 1_000_000_000),
+      createdAt,
+      updatedAt,
+    },
+    activeLeagueId: leagueId,
+    leagues: {
+      [leagueId]: buildLeagueSave(state, leagueId, DEFAULT_LEAGUE_NAME, nowIso),
+    },
+  }
+}
+
 export class GameRepositoryImpl implements GameRepository {
   constructor(
     private readonly store: SqliteStore,
@@ -405,7 +446,34 @@ export class GameRepositoryImpl implements GameRepository {
     await this.store.clearState(SAVE_ID)
   }
 
-  async load(): Promise<GameState | null> {
+  private parsePayload(payload: string): unknown {
+    const parsed = JSON.parse(payload)
+    if (typeof parsed === 'string') {
+      try {
+        return JSON.parse(parsed)
+      } catch {
+        return parsed
+      }
+    }
+    return parsed
+  }
+
+  private selectState(root: GameSaveRoot, leagueId?: string): GameState | null {
+    const league =
+      typeof leagueId === 'string'
+        ? (root.leagues[leagueId] ?? null)
+        : (root.leagues[root.activeLeagueId] ?? Object.values(root.leagues)[0] ?? null)
+    if (!league) {
+      return null
+    }
+    const season = league.seasons[league.activeSeasonId] ?? Object.values(league.seasons)[0] ?? null
+    if (!season) {
+      return null
+    }
+    return structuredClone(season.state)
+  }
+
+  private async readRootPayload(): Promise<GameSaveRoot | null> {
     const payload = await this.store.readState(SAVE_ID)
     if (!payload) {
       return null
@@ -413,38 +481,72 @@ export class GameRepositoryImpl implements GameRepository {
 
     let data: unknown
     try {
-      data = JSON.parse(payload)
+      data = this.parsePayload(payload)
     } catch (error) {
       console.warn('[storage] dropping invalid JSON save payload', error)
       await this.quarantineCorruptPayload(payload)
       return null
     }
-    if (typeof data === 'string') {
-      try {
-        data = JSON.parse(data)
-      } catch {
-        // Continue with original parsed value and let schema validation decide.
-      }
+
+    const parsedRoot = gameSaveRootV3Schema.safeParse(data)
+    if (parsedRoot.success) {
+      return parsedRoot.data
     }
 
-    const parsed = gameSaveSchema.safeParse(data)
-    if (!parsed.success) {
-      const repaired = repairLegacySave(data)
-      const repairedParsed = gameSaveSchema.safeParse(repaired)
-      if (!repairedParsed.success) {
-        console.warn('[storage] dropping unrecoverable save payload', repairedParsed.error.issues)
-        await this.quarantineCorruptPayload(payload)
-        return null
-      }
-      await this.store.writeState(SAVE_ID, JSON.stringify(repairedParsed.data))
-      return repairedParsed.data
+    const parsedState = gameStateSchema.safeParse(data)
+    if (parsedState.success) {
+      const migrated = buildRootFromState(parsedState.data)
+      await this.store.writeState(SAVE_ID, JSON.stringify(migrated))
+      return migrated
     }
 
-    return parsed.data
+    const repaired = repairLegacySave(data)
+    const repairedState = gameStateSchema.safeParse(repaired)
+    if (!repairedState.success) {
+      console.warn('[storage] dropping unrecoverable save payload', repairedState.error.issues)
+      await this.quarantineCorruptPayload(payload)
+      return null
+    }
+
+    const migrated = buildRootFromState(repairedState.data)
+    await this.store.writeState(SAVE_ID, JSON.stringify(migrated))
+    return migrated
   }
 
-  async save(state: GameState): Promise<void> {
-    await this.store.writeState(SAVE_ID, JSON.stringify(state))
+  async load(leagueId?: string): Promise<GameState | null> {
+    const root = await this.readRootPayload()
+    if (!root) {
+      return null
+    }
+    return this.selectState(root, leagueId)
+  }
+
+  async save(state: GameState, leagueId?: string): Promise<void> {
+    const nowIso = new Date().toISOString()
+    const root = (await this.readRootPayload()) ?? buildRootFromState(state, leagueId ?? DEFAULT_LEAGUE_ID)
+    const targetLeagueId = leagueId ?? root.activeLeagueId ?? DEFAULT_LEAGUE_ID
+    const league = root.leagues[targetLeagueId]
+
+    if (!league) {
+      root.leagues[targetLeagueId] = buildLeagueSave(state, targetLeagueId, DEFAULT_LEAGUE_NAME, nowIso)
+    } else {
+      const activeSeasonId = league.activeSeasonId || DEFAULT_SEASON_ID
+      const existingSeason = league.seasons[activeSeasonId]
+      league.seasons[activeSeasonId] = {
+        id: activeSeasonId,
+        name: existingSeason?.name ?? DEFAULT_SEASON_NAME,
+        state: structuredClone(state),
+        createdAt: existingSeason?.createdAt ?? asIsoDateString(state.metadata.createdAt, nowIso),
+        updatedAt: nowIso,
+      }
+      league.updatedAt = nowIso
+    }
+
+    root.activeLeagueId = targetLeagueId
+    root.metadata.updatedAt = nowIso
+    root.metadata.engineVersion = ENGINE_VERSION
+    await this.store.writeState(SAVE_ID, JSON.stringify(root))
+
     if (state.phase === 'complete') {
       try {
         await this.seasonSummaryStore.write(buildSeasonSummary(state))
@@ -454,25 +556,51 @@ export class GameRepositoryImpl implements GameRepository {
     }
   }
 
-  async transaction<T>(run: (current: GameState | null) => Promise<{ nextState?: GameState; result: T }>): Promise<T> {
-    const current = await this.load()
-    const snapshot = current ? JSON.stringify(current) : null
+  async transaction<T>(
+    run: (current: GameState | null) => Promise<{ nextState?: GameState; result: T }>,
+    leagueId?: string,
+  ): Promise<T> {
+    const current = await this.load(leagueId)
+    const snapshot = await this.store.readState(SAVE_ID)
 
     try {
       const outcome = await run(current ? structuredClone(current) : null)
       if (outcome.nextState) {
-        await this.save(outcome.nextState)
+        await this.save(outcome.nextState, leagueId)
       }
       return outcome.result
     } catch (error) {
       if (snapshot) {
         await this.store.writeState(SAVE_ID, snapshot)
+      } else {
+        await this.store.clearState(SAVE_ID)
       }
       throw error
     }
   }
 
-  async reset(): Promise<void> {
-    await this.store.clearState(SAVE_ID)
+  async reset(leagueId?: string): Promise<void> {
+    if (!leagueId) {
+      await this.store.clearState(SAVE_ID)
+      return
+    }
+
+    const root = await this.readRootPayload()
+    if (!root) {
+      return
+    }
+
+    delete root.leagues[leagueId]
+    const remainingLeagueIds = Object.keys(root.leagues)
+    if (remainingLeagueIds.length === 0) {
+      await this.store.clearState(SAVE_ID)
+      return
+    }
+
+    if (!root.leagues[root.activeLeagueId]) {
+      root.activeLeagueId = remainingLeagueIds[0]
+    }
+    root.metadata.updatedAt = new Date().toISOString()
+    await this.store.writeState(SAVE_ID, JSON.stringify(root))
   }
 }

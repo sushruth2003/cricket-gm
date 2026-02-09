@@ -192,3 +192,26 @@ export interface SimulateSeasonProgress {
   completedMatches: number
   totalMatches: number
 }
+
+export interface LeagueSeasonSave {
+  id: string
+  name: string
+  state: GameState
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LeagueSave {
+  id: string
+  name: string
+  activeSeasonId: string
+  seasons: Record<string, LeagueSeasonSave>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface GameSaveRoot {
+  metadata: SaveMetadata & { schemaVersion: 3 }
+  activeLeagueId: string
+  leagues: Record<string, LeagueSave>
+}

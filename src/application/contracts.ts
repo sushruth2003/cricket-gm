@@ -135,14 +135,16 @@ const matchSchema = z.object({
   innings: z.tuple([inningsSchema, inningsSchema]).nullable(),
 })
 
-export const gameSaveSchema = z.object({
-  metadata: z.object({
-    schemaVersion: z.literal(2),
-    engineVersion: z.string(),
-    seed: z.number().int(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-  }),
+const metadataSchema = z.object({
+  schemaVersion: z.number().int().min(1),
+  engineVersion: z.string(),
+  seed: z.number().int(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const gameStateSchema = z.object({
+  metadata: metadataSchema,
   config: z.object({
     teamCount: z.number().int().min(2).max(20),
     format: z.literal('T20'),
@@ -196,4 +198,38 @@ export const gameSaveSchema = z.object({
   ),
 })
 
-export type GameSaveV1 = z.infer<typeof gameSaveSchema>
+const seasonSaveSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  state: gameStateSchema,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+const leagueSaveSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  activeSeasonId: z.string(),
+  seasons: z.record(z.string(), seasonSaveSchema),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const gameSaveRootV3Schema = z.object({
+  metadata: z.object({
+    schemaVersion: z.literal(3),
+    engineVersion: z.string(),
+    seed: z.number().int(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  }),
+  activeLeagueId: z.string(),
+  leagues: z.record(z.string(), leagueSaveSchema),
+})
+
+export const gameSaveSchema = gameStateSchema
+
+export type GameSave = z.infer<typeof gameStateSchema>
+export type GameSaveV2 = z.infer<typeof gameStateSchema>
+export type GameSaveV3 = z.infer<typeof gameSaveRootV3Schema>
+export type GameSaveV1 = z.infer<typeof gameStateSchema>

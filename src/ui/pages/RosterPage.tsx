@@ -1,74 +1,79 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatCr } from '@/ui/format/currency'
 import { useApp } from '@/ui/useApp'
+import {
+  autosortDraftOrder,
+  buildInitialDraftOrder,
+  movePlayerInOrder,
+  resolveActiveWicketkeeper,
+  sanitizeDraftOrder,
+  STARTING_XI_SIZE,
+  type SortKey,
+} from '@/ui/pages/rosterOrdering'
 
-type SortKey = 'name' | 'role' | 'bat' | 'bowl' | 'fielding' | 'fitness' | 'temperament'
+const toLabel = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
 
 export const RosterPage = () => {
   const { state, actions } = useApp()
 
-  const [presetOverride, setPresetOverride] = useState<'balanced' | 'aggressive' | 'defensive' | null>(null)
-  const [selected, setSelected] = useState<string[]>([])
-  const [selectedWicketkeeper, setSelectedWicketkeeper] = useState<string | null>(null)
+  const [presetOverrideByTeam, setPresetOverrideByTeam] = useState<
+    Record<string, 'balanced' | 'aggressive' | 'defensive' | null>
+  >({})
+  const [selectedWicketkeeperByTeam, setSelectedWicketkeeperByTeam] = useState<Record<string, string | null>>({})
+  const [draftOrderByTeam, setDraftOrderByTeam] = useState<Record<string, string[]>>({})
   const [sortBy, setSortBy] = useState<SortKey>('bat')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [draggingPlayerId, setDraggingPlayerId] = useState<string | null>(null)
+  const [dragOverPlayerId, setDragOverPlayerId] = useState<string | null>(null)
+  const lastAutoSaveKeyRef = useRef<string>('')
 
   const userTeam = useMemo(() => state?.teams.find((team) => team.id === state.userTeamId), [state])
+  const teamId = userTeam?.id ?? null
+  const persistedPlayingXi = useMemo(() => userTeam?.playingXi ?? [], [userTeam?.playingXi])
+  const persistedWicketkeeper = userTeam?.wicketkeeperPlayerId ?? null
+  const persistedBowlingPreset = userTeam?.bowlingPreset ?? 'balanced'
   const rosterPlayers = useMemo(
-    () => state?.players.filter((player) => player.teamId === userTeam?.id) ?? [],
-    [state, userTeam?.id],
+    () => state?.players.filter((player) => player.teamId === teamId) ?? [],
+    [state, teamId],
+  )
+
+  const presetOverride = teamId ? presetOverrideByTeam[teamId] ?? null : null
+  const selectedWicketkeeper = teamId ? selectedWicketkeeperByTeam[teamId] ?? null : null
+  const baseDraftOrder = useMemo(() => {
+    if (!teamId) {
+      return []
+    }
+    return draftOrderByTeam[teamId] ?? buildInitialDraftOrder(rosterPlayers, persistedPlayingXi)
+  }, [draftOrderByTeam, persistedPlayingXi, rosterPlayers, teamId])
+
+  const normalizedDraftOrder = useMemo(
+    () => sanitizeDraftOrder(baseDraftOrder, rosterPlayers, persistedPlayingXi),
+    [baseDraftOrder, persistedPlayingXi, rosterPlayers],
   )
   const activeSelection = useMemo(
-    () => (selected.length > 0 ? selected : userTeam?.playingXi ?? []),
-    [selected, userTeam?.playingXi],
+    () => normalizedDraftOrder.slice(0, Math.min(STARTING_XI_SIZE, normalizedDraftOrder.length)),
+    [normalizedDraftOrder],
   )
-  const preset = presetOverride ?? userTeam?.bowlingPreset ?? 'balanced'
+  const lineupNumberByPlayerId = useMemo(
+    () => new Map(activeSelection.map((playerId, index) => [playerId, index + 1])),
+    [activeSelection],
+  )
+  const playersById = useMemo(() => new Map(rosterPlayers.map((player) => [player.id, player])), [rosterPlayers])
+  const orderedPlayers = useMemo(
+    () => normalizedDraftOrder.map((playerId) => playersById.get(playerId)).filter((player) => Boolean(player)),
+    [normalizedDraftOrder, playersById],
+  )
+  const preset = presetOverride ?? persistedBowlingPreset
+
   const playerNameById = useMemo(
     () => new Map(rosterPlayers.map((player) => [player.id, `${player.firstName} ${player.lastName}`])),
     [rosterPlayers],
   )
-  const activeWicketkeeper = useMemo(() => {
-    const candidate = selectedWicketkeeper ?? userTeam?.wicketkeeperPlayerId ?? null
-    if (candidate && activeSelection.includes(candidate)) {
-      return candidate
-    }
-    return activeSelection[0] ?? null
-  }, [activeSelection, selectedWicketkeeper, userTeam?.wicketkeeperPlayerId])
 
-  const sortedPlayers = useMemo(() => {
-    const sorted = [...rosterPlayers]
-    sorted.sort((a, b) => {
-      const getValue = (player: (typeof rosterPlayers)[number]) => {
-        switch (sortBy) {
-          case 'name':
-            return `${player.firstName} ${player.lastName}`.toLowerCase()
-          case 'role':
-            return player.role
-          case 'bat':
-            return player.ratings.batting.overall
-          case 'bowl':
-            return player.ratings.bowling.overall
-          case 'fielding':
-            return player.ratings.fielding.overall
-          case 'fitness':
-            return player.ratings.fitness
-          case 'temperament':
-            return player.ratings.temperament
-          default:
-            return player.ratings.batting.overall
-        }
-      }
-      const aValue = getValue(a)
-      const bValue = getValue(b)
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortDirection === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue)
-      }
-      return sortDirection === 'asc'
-        ? Number(aValue) - Number(bValue)
-        : Number(bValue) - Number(aValue)
-    })
-    return sorted
-  }, [rosterPlayers, sortBy, sortDirection])
+  const activeWicketkeeper = useMemo(
+    () => resolveActiveWicketkeeper(activeSelection, selectedWicketkeeper, persistedWicketkeeper),
+    [activeSelection, persistedWicketkeeper, selectedWicketkeeper],
+  )
 
   const derived = useMemo(() => {
     if (!userTeam) {
@@ -80,12 +85,14 @@ export const RosterPage = () => {
         rating: 0,
       }
     }
+
     const lineup = rosterPlayers.filter((player) => activeSelection.includes(player.id))
     const source = lineup.length ? lineup : rosterPlayers
     const divisor = source.length || 1
     const avgBat = source.reduce((sum, player) => sum + player.ratings.batting.overall, 0) / divisor
     const avgBowl = source.reduce((sum, player) => sum + player.ratings.bowling.overall, 0) / divisor
     const avgFielding = source.reduce((sum, player) => sum + player.ratings.fielding.overall, 0) / divisor
+
     return {
       starters: activeSelection.length,
       avgBat,
@@ -95,20 +102,92 @@ export const RosterPage = () => {
     }
   }, [activeSelection, rosterPlayers, userTeam])
 
+  useEffect(() => {
+    if (!teamId) {
+      lastAutoSaveKeyRef.current = ''
+      return
+    }
+    lastAutoSaveKeyRef.current = ''
+  }, [teamId])
+
+  useEffect(() => {
+    if (!teamId) {
+      return
+    }
+    if (activeSelection.length !== STARTING_XI_SIZE || rosterPlayers.length < STARTING_XI_SIZE || !activeWicketkeeper) {
+      return
+    }
+
+    const nextKey = `${teamId}|${activeSelection.join(',')}|${activeWicketkeeper}|${preset}`
+    const persistedKey = `${teamId}|${persistedPlayingXi.join(',')}|${persistedWicketkeeper ?? ''}|${persistedBowlingPreset}`
+    if (nextKey === persistedKey || nextKey === lastAutoSaveKeyRef.current) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      lastAutoSaveKeyRef.current = nextKey
+      void actions
+        .updateTeamSetup({
+          playingXi: activeSelection,
+          wicketkeeperPlayerId: activeWicketkeeper,
+          bowlingPreset: preset,
+        })
+        .catch(() => {
+          if (lastAutoSaveKeyRef.current === nextKey) {
+            lastAutoSaveKeyRef.current = ''
+          }
+        })
+    }, 250)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [
+    actions,
+    activeSelection,
+    activeWicketkeeper,
+    persistedBowlingPreset,
+    persistedPlayingXi,
+    persistedWicketkeeper,
+    preset,
+    rosterPlayers.length,
+    teamId,
+  ])
+
   if (!state || !userTeam) {
     return <p className="card">Create a league and complete auction first.</p>
   }
 
-  const togglePlayer = (playerId: string) => {
-    setSelected((current) => {
-      const base = current.length > 0 ? current : userTeam.playingXi
-      if (base.includes(playerId)) {
-        return base.filter((id) => id !== playerId)
+  const setTeamDraftOrder = (updater: (current: string[]) => string[]) => {
+    setDraftOrderByTeam((current) => {
+      const source = sanitizeDraftOrder(current[userTeam.id] ?? buildInitialDraftOrder(rosterPlayers, userTeam.playingXi), rosterPlayers, userTeam.playingXi)
+      return {
+        ...current,
+        [userTeam.id]: updater(source),
       }
-      if (base.length >= 11) {
-        return base
+    })
+  }
+
+  const setTeamWicketkeeper = (next: string | null) => {
+    setSelectedWicketkeeperByTeam((current) => ({
+      ...current,
+      [userTeam.id]: next,
+    }))
+  }
+
+  const toggleStarterStatus = (playerId: string) => {
+    setTeamDraftOrder((source) => {
+      const index = source.indexOf(playerId)
+      if (index === -1) {
+        return source
       }
-      return [...base, playerId]
+
+      if (index < STARTING_XI_SIZE) {
+        return movePlayerInOrder(source, playerId, source.length - 1)
+      }
+
+      const starterBoundary = Math.min(STARTING_XI_SIZE - 1, source.length - 1)
+      return movePlayerInOrder(source, playerId, starterBoundary)
     })
   }
 
@@ -122,6 +201,27 @@ export const RosterPage = () => {
   }
 
   const sortMarker = (column: SortKey) => (sortBy === column ? (sortDirection === 'asc' ? '▲' : '▼') : '▵')
+
+  const onAutoSort = () => {
+    const nextOrder = autosortDraftOrder(rosterPlayers, sortBy, sortDirection)
+    const nextXi = nextOrder.slice(0, Math.min(STARTING_XI_SIZE, nextOrder.length))
+
+    setDraftOrderByTeam((current) => ({
+      ...current,
+      [userTeam.id]: nextOrder,
+    }))
+    setTeamWicketkeeper(selectedWicketkeeper && nextXi.includes(selectedWicketkeeper) ? selectedWicketkeeper : null)
+  }
+
+  const onDropOnRow = (targetIndex: number) => {
+    if (!draggingPlayerId) {
+      return
+    }
+
+    setTeamDraftOrder((source) => movePlayerInOrder(source, draggingPlayerId, targetIndex))
+    setDraggingPlayerId(null)
+    setDragOverPlayerId(null)
+  }
 
   return (
     <section className="teamPage">
@@ -163,28 +263,23 @@ export const RosterPage = () => {
             Bowling preset
             <select
               value={preset}
-              onChange={(event) => setPresetOverride(event.target.value as 'balanced' | 'aggressive' | 'defensive')}
+              onChange={(event) =>
+                setPresetOverrideByTeam((current) => ({
+                  ...current,
+                  [userTeam.id]: event.target.value as 'balanced' | 'aggressive' | 'defensive',
+                }))
+              }
             >
               <option value="balanced">Balanced</option>
               <option value="aggressive">Aggressive</option>
               <option value="defensive">Defensive</option>
             </select>
           </label>
-          <button
-            onClick={() =>
-              activeWicketkeeper
-                ? actions.updateTeamSetup({
-                    playingXi: activeSelection,
-                    wicketkeeperPlayerId: activeWicketkeeper,
-                    bowlingPreset: preset,
-                  })
-                : null
-            }
-            disabled={activeSelection.length !== 11 || rosterPlayers.length < 11 || !activeWicketkeeper}
-          >
-            Save Team Setup
+
+          <button type="button" onClick={onAutoSort} disabled={rosterPlayers.length === 0}>
+            Auto Sort ({toLabel(sortBy)} {sortDirection === 'asc' ? 'Asc' : 'Desc'})
           </button>
-          <p className="teamHint">Pick exactly 11 players, then choose a wicketkeeper from that XI.</p>
+          <p className="teamHint">Drag handles to reorder lineup. Team setup auto-saves when your XI is valid.</p>
         </div>
       </div>
 
@@ -192,7 +287,8 @@ export const RosterPage = () => {
         <table className="rosterTable">
           <thead>
             <tr>
-              <th>XI</th>
+              <th>Move</th>
+              <th>Lineup</th>
               <th>WK</th>
               <th>
                 <button type="button" className="sortHeader" onClick={() => onSort('name')}>
@@ -204,6 +300,7 @@ export const RosterPage = () => {
                   Role {sortMarker('role')}
                 </button>
               </th>
+              <th>Type</th>
               <th>
                 <button type="button" className="sortHeader" onClick={() => onSort('bat')}>
                   Bat {sortMarker('bat')}
@@ -232,35 +329,82 @@ export const RosterPage = () => {
             </tr>
           </thead>
           <tbody>
-            {sortedPlayers.map((player) => (
-              <tr key={player.id} className={activeSelection.includes(player.id) ? 'inXi' : ''}>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={activeSelection.includes(player.id)}
-                    onChange={() => togglePlayer(player.id)}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="radio"
-                    name="designated-wicketkeeper"
-                    checked={activeWicketkeeper === player.id}
-                    onChange={() => setSelectedWicketkeeper(player.id)}
-                    disabled={!activeSelection.includes(player.id)}
-                  />
-                </td>
-                <td>
-                  {player.firstName} {player.lastName}
-                </td>
-                <td>{player.role}</td>
-                <td>{player.ratings.batting.overall}</td>
-                <td>{player.ratings.bowling.overall}</td>
-                <td>{player.ratings.fielding.overall}</td>
-                <td>{player.ratings.fitness}</td>
-                <td>{player.ratings.temperament}</td>
-              </tr>
-            ))}
+            {orderedPlayers.map((player, index) => {
+              if (!player) {
+                return null
+              }
+
+              const lineupNumber = lineupNumberByPlayerId.get(player.id)
+              const isStarter = typeof lineupNumber === 'number'
+              const isBenchStart = index === STARTING_XI_SIZE
+
+              return (
+                <tr
+                  key={player.id}
+                  className={[
+                    isStarter ? 'inXi' : 'benchRow',
+                    isBenchStart ? 'benchStartRow' : '',
+                    draggingPlayerId === player.id ? 'draggingRow' : '',
+                    dragOverPlayerId === player.id ? 'dragOverRow' : '',
+                  ]
+                    .filter((value) => value.length > 0)
+                    .join(' ')}
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    setDragOverPlayerId(player.id)
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    onDropOnRow(index)
+                  }}
+                >
+                  <td>
+                    <button
+                      type="button"
+                      className="dragHandle"
+                      draggable
+                      aria-label={`Drag ${player.firstName} ${player.lastName}`}
+                      onDragStart={() => setDraggingPlayerId(player.id)}
+                      onDragEnd={() => {
+                        setDraggingPlayerId(null)
+                        setDragOverPlayerId(null)
+                      }}
+                      onClick={() => toggleStarterStatus(player.id)}
+                    >
+                      ≡
+                    </button>
+                  </td>
+                  <td>
+                    <span className={isStarter ? 'lineupTag starterTag' : 'lineupTag benchTag'}>
+                      {isStarter ? lineupNumber : 'Bench'}
+                    </span>
+                  </td>
+                  <td>
+                    <input
+                      type="radio"
+                      name="designated-wicketkeeper"
+                      checked={activeWicketkeeper === player.id}
+                      onChange={() => setTeamWicketkeeper(player.id)}
+                      disabled={!isStarter}
+                    />
+                  </td>
+                  <td>
+                    {player.firstName} {player.lastName}
+                  </td>
+                  <td>{toLabel(player.role)}</td>
+                  <td>
+                    <span className={`typeBadge ${player.ratings.bowling.style}`}>
+                      {toLabel(player.ratings.bowling.style)}
+                    </span>
+                  </td>
+                  <td>{player.ratings.batting.overall}</td>
+                  <td>{player.ratings.bowling.overall}</td>
+                  <td>{player.ratings.fielding.overall}</td>
+                  <td>{player.ratings.fitness}</td>
+                  <td>{player.ratings.temperament}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

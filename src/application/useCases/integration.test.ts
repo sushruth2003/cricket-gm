@@ -47,4 +47,18 @@ describe('application integration flow', () => {
     expect(played).toHaveLength(state.teams.length / 2)
     expect(played.every((fixture) => fixture.scheduledAt === firstDate)).toBe(true)
   })
+
+  it('creates and loads separate leagues without state bleed', async () => {
+    const repo = new MemoryRepository()
+    const leagueA = await createLeague(repo, 9011, { leagueId: 'league-a', leagueName: 'League A', seasonYear: 2025, policySet: 'ipl-2025-cycle' })
+    const leagueB = await createLeague(repo, 9012, { leagueId: 'league-b', leagueName: 'League B', seasonYear: 2026, policySet: 'ipl-2025-cycle' })
+
+    const loadedA = await repo.load('league-a')
+    const loadedB = await repo.load('league-b')
+
+    expect(leagueA.metadata.seed).toBe(9011)
+    expect(leagueB.metadata.seed).toBe(9012)
+    expect(loadedA?.metadata.seed).toBe(9011)
+    expect(loadedB?.metadata.seed).toBe(9012)
+  })
 })

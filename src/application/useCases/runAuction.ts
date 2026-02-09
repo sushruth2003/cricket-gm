@@ -11,7 +11,7 @@ const finalizeScheduleIfReady = (next: GameState) => {
   next.fixtures = generateRoundRobinFixtures(next.teams, next.metadata.createdAt)
 }
 
-export const runAuction = async (repository: GameRepository): Promise<GameState> => {
+export const runAuction = async (repository: GameRepository, leagueId?: string): Promise<GameState> => {
   return repository.transaction(async (current) => {
     if (!current) {
       throw new Error('No league loaded')
@@ -24,12 +24,13 @@ export const runAuction = async (repository: GameRepository): Promise<GameState>
     assertGameStateSemanticIntegrity(next)
 
     return { nextState: next, result: next }
-  })
+  }, leagueId)
 }
 
 export const progressAuctionForUser = async (
   repository: GameRepository,
   userAction: UserAuctionAction,
+  leagueId?: string,
 ): Promise<GameState> => {
   return repository.transaction(async (current) => {
     if (!current) {
@@ -43,5 +44,5 @@ export const progressAuctionForUser = async (
     assertGameStateSemanticIntegrity(next)
 
     return { nextState: next, result: next }
-  })
+  }, leagueId)
 }

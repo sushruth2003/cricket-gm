@@ -27,6 +27,7 @@ export interface SaveMetadata {
 export interface LeagueConfig {
   teamCount: number
   format: 'T20'
+  policySet: AuctionPolicySet
   auctionBudget: number
   minSquadSize: number
   maxSquadSize: number

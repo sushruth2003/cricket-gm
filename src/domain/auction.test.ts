@@ -90,6 +90,7 @@ const makeState = (players: Player[], teams: Team[]): GameState => ({
   config: {
     teamCount: teams.length,
     format: 'T20',
+    policySet: 'legacy-default',
     auctionBudget: 12_000,
     minSquadSize: 2,
     maxSquadSize: 25,

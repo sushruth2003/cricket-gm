@@ -2,14 +2,17 @@ import { useApp } from '@/ui/useApp'
 import { formatCr } from '@/ui/format/currency'
 
 export const DashboardPage = () => {
-  const { state, actions, views } = useApp()
+  const { state, leagues, activeLeagueId, actions, views } = useApp()
 
   if (!state) {
     return (
       <section className="card">
         <h2>Welcome</h2>
         <p>Create a new fictional league to begin.</p>
-        <button onClick={() => actions.createOrLoadLeague()}>Create League</button>
+        <div className="actions">
+          <button onClick={() => actions.createOrLoadLeague()}>Create League</button>
+          <button onClick={() => actions.createLeague()}>Create Additional League</button>
+        </div>
       </section>
     )
   }
@@ -21,8 +24,27 @@ export const DashboardPage = () => {
   return (
     <section className="grid">
       <article className="card">
+        <h2>League Control</h2>
+        <p>Active League: {activeLeagueId ?? 'None'}</p>
+        <label>
+          Select League:{' '}
+          <select value={activeLeagueId ?? ''} onChange={(event) => actions.selectLeague(event.target.value)}>
+            {leagues.map((league) => (
+              <option key={league.id} value={league.id}>
+                {league.name} ({league.activeSeasonId})
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="actions">
+          <button onClick={() => actions.createLeague()}>Create New League</button>
+        </div>
+      </article>
+
+      <article className="card">
         <h2>Season Status</h2>
         <p>Phase: {state.phase}</p>
+        <p>Season Start: {new Date(state.metadata.createdAt).toISOString().slice(0, 10)}</p>
         <p>Played Matches: {played}</p>
         <p>Remaining Matches: {pending}</p>
         <div className="actions">
@@ -31,6 +53,9 @@ export const DashboardPage = () => {
           </button>
           <button onClick={() => actions.simulateSeason()} disabled={state.phase === 'auction' || state.phase === 'complete'}>
             Sim Full Season
+          </button>
+          <button onClick={() => actions.advanceSeason()} disabled={state.phase !== 'complete'}>
+            Advance To Next Season
           </button>
         </div>
       </article>

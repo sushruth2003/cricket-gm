@@ -1,4 +1,6 @@
 import type { GameRepository } from '@/application/gameRepository'
+import type { LeagueSummary } from '@/application/gameRepository'
+import { advanceSeason } from '@/application/useCases/advanceSeason'
 import { createLeague } from '@/application/useCases/createLeague'
 import { exportSave } from '@/application/useCases/exportSave'
 import { importSave } from '@/application/useCases/importSave'
@@ -12,22 +14,28 @@ import { selectStorageAdapter } from '@/infrastructure/storage/storageFactory'
 
 export interface AppServices {
   repository: GameRepository
-  getState(): Promise<GameState | null>
+  getState(leagueId?: string): Promise<GameState | null>
+  listLeagues(): Promise<LeagueSummary[]>
+  getActiveLeagueId(): Promise<string | null>
   initialize(seed?: number): Promise<GameState>
-  runAuction(): Promise<GameState>
-  auctionBid(): Promise<GameState>
-  auctionPass(): Promise<GameState>
-  auctionAuto(): Promise<GameState>
+  createLeague(input?: { seed?: number; name?: string }): Promise<GameState>
+  selectLeague(leagueId: string): Promise<GameState>
+  runAuction(leagueId?: string): Promise<GameState>
+  auctionBid(leagueId?: string): Promise<GameState>
+  auctionPass(leagueId?: string): Promise<GameState>
+  auctionAuto(leagueId?: string): Promise<GameState>
   updateUserTeamSetup(input: {
     playingXi: string[]
     wicketkeeperPlayerId: string
     bowlingPreset: 'balanced' | 'aggressive' | 'defensive'
-  }): Promise<GameState>
-  simulateOneMatch(): Promise<GameState>
+  }, leagueId?: string): Promise<GameState>
+  simulateOneMatch(leagueId?: string): Promise<GameState>
   simulateSeasonWithWorker(params: {
     onProgress: (state: GameState, completed: number, total: number) => void
     signal?: AbortSignal
+    leagueId?: string
   }): Promise<GameState>
+  advanceSeason(leagueId?: string): Promise<GameState>
   exportSave(): Promise<string>
   importSave(raw: string): Promise<GameState>
 }
@@ -44,7 +52,9 @@ export const createAppServices = async (): Promise<AppServices> => {
 
   return {
     repository,
-    getState: () => repository.load(),
+    getState: (leagueId?: string) => repository.load(leagueId),
+    listLeagues: () => repository.listLeagues(),
+    getActiveLeagueId: () => repository.getActiveLeagueId(),
     initialize: async (seed?: number) => {
       const existing = await repository.load()
       if (existing) {
@@ -52,22 +62,35 @@ export const createAppServices = async (): Promise<AppServices> => {
       }
       return createLeague(repository, seed)
     },
-    runAuction: () => runAuction(repository),
-    auctionBid: () => progressAuctionForUser(repository, 'bid'),
-    auctionPass: () => progressAuctionForUser(repository, 'pass'),
-    auctionAuto: () => progressAuctionForUser(repository, 'auto'),
-    updateUserTeamSetup: (input) => updateUserTeamSetup(repository, input),
-    simulateOneMatch: async () => {
-      const state = await repository.load()
+    createLeague: async (input?: { seed?: number; name?: string }) => {
+      const leagueName = input?.name?.trim().length ? input.name.trim() : `League ${Date.now().toString().slice(-4)}`
+      const leagueId = `league-${Date.now().toString(36)}`
+      return createLeague(repository, input?.seed, { leagueId, leagueName })
+    },
+    selectLeague: async (leagueId: string) => {
+      await repository.setActiveLeague(leagueId)
+      const loaded = await repository.load(leagueId)
+      if (!loaded) {
+        throw new Error(`League not found: ${leagueId}`)
+      }
+      return loaded
+    },
+    runAuction: (leagueId?: string) => runAuction(repository, leagueId),
+    auctionBid: (leagueId?: string) => progressAuctionForUser(repository, 'bid', leagueId),
+    auctionPass: (leagueId?: string) => progressAuctionForUser(repository, 'pass', leagueId),
+    auctionAuto: (leagueId?: string) => progressAuctionForUser(repository, 'auto', leagueId),
+    updateUserTeamSetup: (input, leagueId?: string) => updateUserTeamSetup(repository, input, leagueId),
+    simulateOneMatch: async (leagueId?: string) => {
+      const state = await repository.load(leagueId)
       if (!state) {
         throw new Error('No league loaded')
       }
       const { nextState } = simulateNextFixture(state)
-      await repository.save(nextState)
+      await repository.save(nextState, leagueId)
       return nextState
     },
-    simulateSeasonWithWorker: async ({ onProgress, signal }) => {
-      const state = await repository.load()
+    simulateSeasonWithWorker: async ({ onProgress, signal, leagueId }) => {
+      const state = await repository.load(leagueId)
       if (!state) {
         throw new Error('No league loaded')
       }
@@ -100,7 +123,7 @@ export const createAppServices = async (): Promise<AppServices> => {
           }
 
           if (message.type === 'complete') {
-            await repository.save(message.payload.state)
+            await repository.save(message.payload.state, leagueId)
             signal?.removeEventListener('abort', abortHandler)
             cleanup()
             resolve(message.payload.state)
@@ -121,6 +144,7 @@ export const createAppServices = async (): Promise<AppServices> => {
         worker.postMessage({ type: 'start', payload: { state } })
       })
     },
+    advanceSeason: (leagueId?: string) => advanceSeason(repository, leagueId),
     exportSave: () => exportSave(repository),
     importSave: (raw: string) => importSave(repository, raw),
   }

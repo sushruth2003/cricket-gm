@@ -1,6 +1,7 @@
 import { createPrng } from '@/domain/prng'
 import { getAuctionOpeningMessage } from '@/domain/auction/policyHooks'
 import { resolveAuctionPolicy } from '@/domain/policy/resolver'
+import type { AuctionPolicyContext } from '@/domain/types'
 import type {
   AuctionPhase,
   BattingTrait,
@@ -411,7 +412,7 @@ export const generateYoungPlayers = (config: LeagueConfig): Player[] => {
 const playerOverall = (player: Player) =>
   Math.round((player.ratings.batting.overall + player.ratings.bowling.overall + player.ratings.fielding.overall) / 3)
 
-const orderPlayersForAuction = (players: Player[]): Array<{ playerId: string; phase: AuctionPhase }> => {
+export const orderPlayersForAuction = (players: Player[]): Array<{ playerId: string; phase: AuctionPhase }> => {
   const byOverall = [...players].sort((a, b) => playerOverall(b) - playerOverall(a))
   const marquee = new Set(byOverall.slice(0, Math.min(16, byOverall.length)).map((player) => player.id))
 
@@ -447,11 +448,23 @@ const orderPlayersForAuction = (players: Player[]): Array<{ playerId: string; ph
   })
 }
 
-export const createInitialState = (seed: number): GameState => {
-  const resolvedPolicy = resolveAuctionPolicy()
+export const createInitialState = (seed: number): GameState => createInitialStateWithOptions(seed)
+
+export interface CreateInitialStateOptions {
+  policyContext?: AuctionPolicyContext
+  seasonStartIso?: string
+}
+
+export const createInitialStateWithOptions = (seed: number, options: CreateInitialStateOptions = {}): GameState => {
+  const resolvedPolicy = resolveAuctionPolicy(options.policyContext)
+  const nowIso = new Date().toISOString()
+  const createdAt = options.seasonStartIso ?? nowIso
+  const updatedAt = createdAt
+  const policySet = options.policyContext?.policySet ?? 'legacy-default'
   const config: LeagueConfig = {
     teamCount: 10,
     format: 'T20',
+    policySet,
     auctionBudget: resolvedPolicy.policy.purse,
     minSquadSize: resolvedPolicy.policy.squadMin,
     maxSquadSize: resolvedPolicy.policy.squadMax,
@@ -469,8 +482,8 @@ export const createInitialState = (seed: number): GameState => {
       schemaVersion: 2,
       engineVersion: '0.2.0',
       seed,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt,
+      updatedAt,
     },
     config,
     simulation: {

@@ -76,6 +76,13 @@ const normalizeAuctionStatus = (value: unknown): 'pending' | 'sold' | 'unsold' =
   return 'pending'
 }
 
+const normalizePolicySet = (value: unknown): 'legacy-default' | 'ipl-2025-cycle' => {
+  if (value === 'legacy-default' || value === 'ipl-2025-cycle') {
+    return value
+  }
+  return 'legacy-default'
+}
+
 const repairLegacySave = (raw: unknown): unknown => {
   const root =
     raw &&
@@ -257,6 +264,7 @@ const repairLegacySave = (raw: unknown): unknown => {
   mutable.config = {
     teamCount: Math.max(2, Math.min(20, asInteger(config.teamCount, defaultTeamCount))),
     format: 'T20',
+    policySet: normalizePolicySet(config.policySet),
     auctionBudget: Math.max(1, asInteger(config.auctionBudget, 1_500)),
     minSquadSize: Math.max(11, asInteger(config.minSquadSize, 20)),
     maxSquadSize: Math.max(11, asInteger(config.maxSquadSize, 25)),
@@ -592,7 +600,14 @@ export class GameRepositoryImpl implements GameRepository {
 
   async createLeague(leagueId: string, leagueName: string, initialState: GameState): Promise<void> {
     const nowIso = new Date().toISOString()
-    const root = (await this.readRootPayload()) ?? buildRootFromState(initialState, leagueId)
+    const existingRoot = await this.readRootPayload()
+    if (!existingRoot) {
+      const root = buildRootFromState(initialState, leagueId)
+      root.leagues[leagueId].name = leagueName
+      await this.store.writeState(SAVE_ID, JSON.stringify(root))
+      return
+    }
+    const root = existingRoot
 
     if (root.leagues[leagueId]) {
       throw new Error(`League already exists: ${leagueId}`)

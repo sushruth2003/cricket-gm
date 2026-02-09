@@ -1,16 +1,16 @@
 import { createRetentionState, createRtmDecision } from '@/domain/auction/policyHooks'
 import { progressAuctionState, runAutoAuctionState, type UserAuctionAction } from '@/domain/auction/stateMachine'
-import { resolveAuctionPolicy, resolveAuctionPolicyForSeason } from '@/domain/policy/resolver'
+import { policyContextFromState, resolveAuctionPolicy, resolveAuctionPolicyForSeason } from '@/domain/policy/resolver'
 import type { AuctionPolicyContext, GameState, Team } from '@/domain/types'
 
 export type { UserAuctionAction }
 
 export const progressAuction = (state: GameState, userAction?: UserAuctionAction): GameState => {
-  return progressAuctionState(state, userAction)
+  return progressAuctionState(state, userAction, policyContextFromState(state))
 }
 
 export const runAutoAuction = (state: GameState): GameState => {
-  return runAutoAuctionState(state)
+  return runAutoAuctionState(state, policyContextFromState(state))
 }
 
 export const progressAuctionWithPolicyContext = (

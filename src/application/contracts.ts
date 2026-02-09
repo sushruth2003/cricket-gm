@@ -148,6 +148,7 @@ export const gameStateSchema = z.object({
   config: z.object({
     teamCount: z.number().int().min(2).max(20),
     format: z.literal('T20'),
+    policySet: z.enum(['legacy-default', 'ipl-2025-cycle']),
     auctionBudget: z.number().int().min(1),
     minSquadSize: z.number().int().min(11),
     maxSquadSize: z.number().int().min(11),

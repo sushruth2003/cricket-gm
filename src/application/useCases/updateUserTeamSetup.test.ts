@@ -52,4 +52,26 @@ describe('updateUserTeamSetup', () => {
       }),
     ).rejects.toThrow('Wicketkeeper must be part of the playing XI')
   })
+
+  it('preserves submitted XI batting order', async () => {
+    const repo = new MemoryRepository()
+    let state = await createLeague(repo, 333)
+    state = await runAuction(repo)
+
+    const team = state.teams.find((candidate) => candidate.id === state.userTeamId)
+    expect(team).toBeDefined()
+    if (!team) {
+      return
+    }
+
+    const reversedXi = [...team.playingXi].reverse()
+    const next = await updateUserTeamSetup(repo, {
+      playingXi: reversedXi,
+      wicketkeeperPlayerId: reversedXi[0],
+      bowlingPreset: 'defensive',
+    })
+    const updatedTeam = next.teams.find((candidate) => candidate.id === next.userTeamId)
+
+    expect(updatedTeam?.playingXi).toEqual(reversedXi)
+  })
 })

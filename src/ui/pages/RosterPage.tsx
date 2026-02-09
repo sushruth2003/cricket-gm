@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatCr } from '@/ui/format/currency'
 import { useApp } from '@/ui/useApp'
 import {
@@ -25,25 +25,30 @@ export const RosterPage = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [draggingPlayerId, setDraggingPlayerId] = useState<string | null>(null)
   const [dragOverPlayerId, setDragOverPlayerId] = useState<string | null>(null)
+  const lastAutoSaveKeyRef = useRef<string>('')
 
   const userTeam = useMemo(() => state?.teams.find((team) => team.id === state.userTeamId), [state])
+  const teamId = userTeam?.id ?? null
+  const persistedPlayingXi = useMemo(() => userTeam?.playingXi ?? [], [userTeam?.playingXi])
+  const persistedWicketkeeper = userTeam?.wicketkeeperPlayerId ?? null
+  const persistedBowlingPreset = userTeam?.bowlingPreset ?? 'balanced'
   const rosterPlayers = useMemo(
-    () => state?.players.filter((player) => player.teamId === userTeam?.id) ?? [],
-    [state, userTeam?.id],
+    () => state?.players.filter((player) => player.teamId === teamId) ?? [],
+    [state, teamId],
   )
 
-  const presetOverride = userTeam ? presetOverrideByTeam[userTeam.id] ?? null : null
-  const selectedWicketkeeper = userTeam ? selectedWicketkeeperByTeam[userTeam.id] ?? null : null
+  const presetOverride = teamId ? presetOverrideByTeam[teamId] ?? null : null
+  const selectedWicketkeeper = teamId ? selectedWicketkeeperByTeam[teamId] ?? null : null
   const baseDraftOrder = useMemo(() => {
-    if (!userTeam) {
+    if (!teamId) {
       return []
     }
-    return draftOrderByTeam[userTeam.id] ?? buildInitialDraftOrder(rosterPlayers, userTeam.playingXi)
-  }, [draftOrderByTeam, rosterPlayers, userTeam])
+    return draftOrderByTeam[teamId] ?? buildInitialDraftOrder(rosterPlayers, persistedPlayingXi)
+  }, [draftOrderByTeam, persistedPlayingXi, rosterPlayers, teamId])
 
   const normalizedDraftOrder = useMemo(
-    () => sanitizeDraftOrder(baseDraftOrder, rosterPlayers, userTeam?.playingXi ?? []),
-    [baseDraftOrder, rosterPlayers, userTeam?.playingXi],
+    () => sanitizeDraftOrder(baseDraftOrder, rosterPlayers, persistedPlayingXi),
+    [baseDraftOrder, persistedPlayingXi, rosterPlayers],
   )
   const activeSelection = useMemo(
     () => normalizedDraftOrder.slice(0, Math.min(STARTING_XI_SIZE, normalizedDraftOrder.length)),
@@ -58,7 +63,7 @@ export const RosterPage = () => {
     () => normalizedDraftOrder.map((playerId) => playersById.get(playerId)).filter((player) => Boolean(player)),
     [normalizedDraftOrder, playersById],
   )
-  const preset = presetOverride ?? userTeam?.bowlingPreset ?? 'balanced'
+  const preset = presetOverride ?? persistedBowlingPreset
 
   const playerNameById = useMemo(
     () => new Map(rosterPlayers.map((player) => [player.id, `${player.firstName} ${player.lastName}`])),
@@ -66,8 +71,8 @@ export const RosterPage = () => {
   )
 
   const activeWicketkeeper = useMemo(
-    () => resolveActiveWicketkeeper(activeSelection, selectedWicketkeeper, userTeam?.wicketkeeperPlayerId ?? null),
-    [activeSelection, selectedWicketkeeper, userTeam?.wicketkeeperPlayerId],
+    () => resolveActiveWicketkeeper(activeSelection, selectedWicketkeeper, persistedWicketkeeper),
+    [activeSelection, persistedWicketkeeper, selectedWicketkeeper],
   )
 
   const derived = useMemo(() => {
@@ -96,6 +101,58 @@ export const RosterPage = () => {
       rating: (avgBat + avgBowl + avgFielding) / 3,
     }
   }, [activeSelection, rosterPlayers, userTeam])
+
+  useEffect(() => {
+    if (!teamId) {
+      lastAutoSaveKeyRef.current = ''
+      return
+    }
+    lastAutoSaveKeyRef.current = ''
+  }, [teamId])
+
+  useEffect(() => {
+    if (!teamId) {
+      return
+    }
+    if (activeSelection.length !== STARTING_XI_SIZE || rosterPlayers.length < STARTING_XI_SIZE || !activeWicketkeeper) {
+      return
+    }
+
+    const nextKey = `${teamId}|${activeSelection.join(',')}|${activeWicketkeeper}|${preset}`
+    const persistedKey = `${teamId}|${persistedPlayingXi.join(',')}|${persistedWicketkeeper ?? ''}|${persistedBowlingPreset}`
+    if (nextKey === persistedKey || nextKey === lastAutoSaveKeyRef.current) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      lastAutoSaveKeyRef.current = nextKey
+      void actions
+        .updateTeamSetup({
+          playingXi: activeSelection,
+          wicketkeeperPlayerId: activeWicketkeeper,
+          bowlingPreset: preset,
+        })
+        .catch(() => {
+          if (lastAutoSaveKeyRef.current === nextKey) {
+            lastAutoSaveKeyRef.current = ''
+          }
+        })
+    }, 250)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [
+    actions,
+    activeSelection,
+    activeWicketkeeper,
+    persistedBowlingPreset,
+    persistedPlayingXi,
+    persistedWicketkeeper,
+    preset,
+    rosterPlayers.length,
+    teamId,
+  ])
 
   if (!state || !userTeam) {
     return <p className="card">Create a league and complete auction first.</p>
@@ -222,22 +279,7 @@ export const RosterPage = () => {
           <button type="button" onClick={onAutoSort} disabled={rosterPlayers.length === 0}>
             Auto Sort ({toLabel(sortBy)} {sortDirection === 'asc' ? 'Asc' : 'Desc'})
           </button>
-
-          <button
-            onClick={() =>
-              activeWicketkeeper
-                ? actions.updateTeamSetup({
-                    playingXi: activeSelection,
-                    wicketkeeperPlayerId: activeWicketkeeper,
-                    bowlingPreset: preset,
-                  })
-                : null
-            }
-            disabled={activeSelection.length !== STARTING_XI_SIZE || rosterPlayers.length < STARTING_XI_SIZE || !activeWicketkeeper}
-          >
-            Save Team Setup
-          </button>
-          <p className="teamHint">Drag handles to reorder lineup. Auto Sort applies current sort rule to the full roster.</p>
+          <p className="teamHint">Drag handles to reorder lineup. Team setup auto-saves when your XI is valid.</p>
         </div>
       </div>
 

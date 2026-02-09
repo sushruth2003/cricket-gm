@@ -1,7 +1,7 @@
 import { advanceSeason } from '@/application/useCases/advanceSeason'
 import { createLeague } from '@/application/useCases/createLeague'
-import { runAuction } from '@/application/useCases/runAuction'
 import { simulateNextFixture } from '@/application/useCases/simulateSeason'
+import { startSeason } from '@/application/useCases/startSeason'
 import { MemoryRepository } from '@/test/memoryRepository'
 
 const completeSeason = async (seed: number) => {
@@ -10,7 +10,7 @@ const completeSeason = async (seed: number) => {
     policySet: 'ipl-2025-cycle',
     seasonYear: 2025,
   })
-  state = await runAuction(repo)
+  state = await startSeason(repo)
   while (state.phase !== 'complete') {
     state = simulateNextFixture(state).nextState
   }

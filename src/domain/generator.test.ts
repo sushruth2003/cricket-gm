@@ -1,4 +1,4 @@
-import { createInitialState, generateYoungPlayers } from '@/domain/generator'
+import { createInitialState, createSeededInitialStateWithOptions, generateYoungPlayers } from '@/domain/generator'
 
 describe('player generation', () => {
   it('maintains a healthy role distribution with pure bowlers present', () => {
@@ -47,5 +47,25 @@ describe('player generation', () => {
 
     const youthPool = generateYoungPlayers(state.config)
     expect(youthPool.length).toBe(prospects.length)
+  })
+
+  it('creates seeded opening season with assigned squads and preseason phase', () => {
+    const state = createSeededInitialStateWithOptions(7007, {
+      seasonStartIso: '2025-01-01T00:00:00.000Z',
+      policyContext: {
+        policySet: 'ipl-2025-cycle',
+        seasonYear: 2025,
+      },
+    })
+
+    expect(state.phase).toBe('preseason')
+    expect(state.auction.complete).toBe(true)
+    expect(state.fixtures.length).toBeGreaterThan(0)
+    expect(state.teams.every((team) => team.rosterPlayerIds.length === state.config.maxSquadSize)).toBe(true)
+    expect(state.teams.every((team) => team.playingXi.length === 11)).toBe(true)
+
+    const assignedPlayers = state.players.filter((player) => player.teamId !== null)
+    expect(assignedPlayers.length).toBe(state.players.length)
+    expect(state.teams.every((team) => team.budgetRemaining >= 0 && team.budgetRemaining < state.config.auctionBudget)).toBe(true)
   })
 })

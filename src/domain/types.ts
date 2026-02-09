@@ -1,4 +1,4 @@
-export type Phase = 'auction' | 'regular-season' | 'playoffs' | 'complete'
+export type Phase = 'auction' | 'preseason' | 'regular-season' | 'playoffs' | 'complete'
 export type AuctionPhase = 'marquee' | 'capped' | 'uncapped' | 'accelerated-1' | 'accelerated-2' | 'complete'
 export type AuctionEntryStatus = 'pending' | 'sold' | 'unsold'
 export type AuctionType = 'mega' | 'mini'

@@ -20,6 +20,7 @@ export const DashboardPage = () => {
   const played = state.fixtures.filter((match) => match.played).length
   const pending = state.fixtures.length - played
   const userTeam = state.teams.find((team) => team.id === state.userTeamId)
+  const canSimulate = state.phase === 'regular-season' || state.phase === 'playoffs'
 
   return (
     <section className="grid">
@@ -48,10 +49,10 @@ export const DashboardPage = () => {
         <p>Played Matches: {played}</p>
         <p>Remaining Matches: {pending}</p>
         <div className="actions">
-          <button onClick={() => actions.simulateMatch()} disabled={state.phase === 'auction'}>
+          <button onClick={() => actions.simulateMatch()} disabled={!canSimulate}>
             Sim Next Match
           </button>
-          <button onClick={() => actions.simulateSeason()} disabled={state.phase === 'auction' || state.phase === 'complete'}>
+          <button onClick={() => actions.simulateSeason()} disabled={!canSimulate}>
             Sim Full Season
           </button>
           <button onClick={() => actions.advanceSeason()} disabled={state.phase !== 'complete'}>

@@ -16,6 +16,9 @@ export const runAuction = async (repository: GameRepository, leagueId?: string):
     if (!current) {
       throw new Error('No league loaded')
     }
+    if (current.auction.complete) {
+      return { nextState: current, result: current }
+    }
 
     const next = runAutoAuction(current)
     finalizeScheduleIfReady(next)

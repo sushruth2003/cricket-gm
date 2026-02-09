@@ -110,6 +110,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       auctionAuto: async () => {
         await mutation.mutateAsync(async () => services.auctionAuto(resolvedActiveLeagueId ?? undefined))
       },
+      startSeason: async () => {
+        await mutation.mutateAsync(async () => services.startSeason(resolvedActiveLeagueId ?? undefined))
+      },
       simulateMatch: async () => {
         await mutation.mutateAsync(async () => services.simulateOneMatch(resolvedActiveLeagueId ?? undefined))
       },

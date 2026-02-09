@@ -1,4 +1,4 @@
-import { createInitialStateWithOptions } from '@/domain/generator'
+import { createSeededInitialStateWithOptions } from '@/domain/generator'
 import type { GameRepository } from '@/application/gameRepository'
 import type { GameState } from '@/domain/types'
 
@@ -17,7 +17,7 @@ export const createLeague = async (
   const seasonYear = options.seasonYear ?? new Date().getUTCFullYear()
   const seasonStartIso = `${seasonYear}-01-01T00:00:00.000Z`
   const policySet = options.policySet ?? 'ipl-2025-cycle'
-  const state = createInitialStateWithOptions(seed, {
+  const state = createSeededInitialStateWithOptions(seed, {
     seasonStartIso,
     policyContext: {
       policySet,

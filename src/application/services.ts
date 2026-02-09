@@ -6,6 +6,7 @@ import { exportSave } from '@/application/useCases/exportSave'
 import { importSave } from '@/application/useCases/importSave'
 import { progressAuctionForUser, runAuction } from '@/application/useCases/runAuction'
 import { simulateNextFixture } from '@/application/useCases/simulateSeason'
+import { startSeason } from '@/application/useCases/startSeason'
 import { updateUserTeamSetup } from '@/application/useCases/updateUserTeamSetup'
 import type { GameState } from '@/domain/types'
 import { GameRepositoryImpl } from '@/infrastructure/repository/gameRepositoryImpl'
@@ -24,6 +25,7 @@ export interface AppServices {
   auctionBid(leagueId?: string): Promise<GameState>
   auctionPass(leagueId?: string): Promise<GameState>
   auctionAuto(leagueId?: string): Promise<GameState>
+  startSeason(leagueId?: string): Promise<GameState>
   updateUserTeamSetup(input: {
     playingXi: string[]
     wicketkeeperPlayerId: string
@@ -79,11 +81,15 @@ export const createAppServices = async (): Promise<AppServices> => {
     auctionBid: (leagueId?: string) => progressAuctionForUser(repository, 'bid', leagueId),
     auctionPass: (leagueId?: string) => progressAuctionForUser(repository, 'pass', leagueId),
     auctionAuto: (leagueId?: string) => progressAuctionForUser(repository, 'auto', leagueId),
+    startSeason: (leagueId?: string) => startSeason(repository, leagueId),
     updateUserTeamSetup: (input, leagueId?: string) => updateUserTeamSetup(repository, input, leagueId),
     simulateOneMatch: async (leagueId?: string) => {
       const state = await repository.load(leagueId)
       if (!state) {
         throw new Error('No league loaded')
+      }
+      if (state.phase === 'auction' || state.phase === 'preseason') {
+        throw new Error('Season simulation is unavailable before regular season starts')
       }
       const { nextState } = simulateNextFixture(state)
       await repository.save(nextState, leagueId)
@@ -93,6 +99,9 @@ export const createAppServices = async (): Promise<AppServices> => {
       const state = await repository.load(leagueId)
       if (!state) {
         throw new Error('No league loaded')
+      }
+      if (state.phase === 'auction' || state.phase === 'preseason') {
+        throw new Error('Season simulation is unavailable before regular season starts')
       }
 
       return new Promise<GameState>((resolve, reject) => {

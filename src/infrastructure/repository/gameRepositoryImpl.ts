@@ -278,6 +278,7 @@ const repairLegacySave = (raw: unknown): unknown => {
 
   mutable.phase =
     mutable.phase === 'auction' ||
+    mutable.phase === 'preseason' ||
     mutable.phase === 'regular-season' ||
     mutable.phase === 'playoffs' ||
     mutable.phase === 'complete'

@@ -1,6 +1,7 @@
 import { createPrng } from '@/domain/prng'
 import { getAuctionOpeningMessage } from '@/domain/auction/policyHooks'
 import { resolveAuctionPolicy } from '@/domain/policy/resolver'
+import { generateRoundRobinFixtures } from '@/domain/schedule'
 import type { AuctionPolicyContext } from '@/domain/types'
 import type {
   AuctionPhase,
@@ -412,6 +413,186 @@ export const generateYoungPlayers = (config: LeagueConfig): Player[] => {
 const playerOverall = (player: Player) =>
   Math.round((player.ratings.batting.overall + player.ratings.bowling.overall + player.ratings.fielding.overall) / 3)
 
+const shuffleWithPrng = <TValue>(values: TValue[], prng: ReturnType<typeof createPrng>): TValue[] => {
+  const next = [...values]
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const swapIndex = prng.nextInt(0, index)
+    const temp = next[index]
+    next[index] = next[swapIndex]
+    next[swapIndex] = temp
+  }
+  return next
+}
+
+const seededMarketValue = (player: Player): number => {
+  const coreValue =
+    player.ratings.batting.overall * 2 +
+    player.ratings.bowling.overall * 2 +
+    Math.round(player.ratings.fielding.overall * 1.5) +
+    Math.round(player.ratings.temperament * 0.5) +
+    Math.round(player.ratings.fitness * 0.5)
+
+  const rolePremium = player.role === 'allrounder' ? 28 : player.role === 'wicketkeeper' ? 18 : player.role === 'bowler' ? 12 : 10
+  const capPremium = player.capped ? 16 : 0
+  const overseasPremium = player.countryTag === 'IN' ? 0 : 20
+  return Math.max(20, coreValue + rolePremium + capPremium + overseasPremium)
+}
+
+const pickBalancedXi = (rosterPlayers: Player[]): { playingXi: string[]; wicketkeeperPlayerId: string | null } => {
+  const sortedByValue = [...rosterPlayers].sort((a, b) => playerOverall(b) - playerOverall(a))
+  const selected = new Map<string, Player>()
+  const addRoleSlice = (role: Player['role'], count: number) => {
+    for (const player of sortedByValue) {
+      if (selected.size >= 11) {
+        break
+      }
+      if (player.role !== role || selected.has(player.id)) {
+        continue
+      }
+      selected.set(player.id, player)
+      if ([...selected.values()].filter((candidate) => candidate.role === role).length >= count) {
+        break
+      }
+    }
+  }
+
+  addRoleSlice('wicketkeeper', 1)
+  addRoleSlice('bowler', 3)
+  addRoleSlice('allrounder', 2)
+  addRoleSlice('batter', 4)
+
+  for (const player of sortedByValue) {
+    if (selected.size >= 11) {
+      break
+    }
+    if (!selected.has(player.id)) {
+      selected.set(player.id, player)
+    }
+  }
+
+  const playingXi = [...selected.values()].slice(0, 11).map((player) => player.id)
+  const wicketkeeperPlayerId =
+    [...selected.values()].find((player) => player.role === 'wicketkeeper')?.id ??
+    sortedByValue.find((player) => player.role === 'wicketkeeper')?.id ??
+    playingXi[0] ??
+    null
+
+  return { playingXi, wicketkeeperPlayerId }
+}
+
+const normalizeDomesticSupply = (players: Player[], requiredDomesticCount: number) => {
+  const domesticCount = players.filter((player) => player.countryTag === 'IN').length
+  if (domesticCount >= requiredDomesticCount) {
+    return
+  }
+  const needs = requiredDomesticCount - domesticCount
+  const overseasCandidates = players
+    .filter((player) => player.countryTag !== 'IN')
+    .sort((a, b) => playerOverall(a) - playerOverall(b))
+
+  for (let index = 0; index < Math.min(needs, overseasCandidates.length); index += 1) {
+    overseasCandidates[index].countryTag = 'IN'
+    overseasCandidates[index].capped = false
+  }
+}
+
+const buildTargetByTeam = (teamIds: string[], total: number, maxPerTeam: number, prng: ReturnType<typeof createPrng>): Map<string, number> => {
+  const target = new Map<string, number>()
+  for (const teamId of teamIds) {
+    target.set(teamId, 0)
+  }
+
+  let remaining = total
+  while (remaining > 0) {
+    const candidateTeams = shuffleWithPrng(
+      teamIds.filter((teamId) => (target.get(teamId) ?? 0) < maxPerTeam),
+      prng,
+    )
+    if (candidateTeams.length === 0) {
+      break
+    }
+    const nextTeamId = candidateTeams[0]
+    target.set(nextTeamId, (target.get(nextTeamId) ?? 0) + 1)
+    remaining -= 1
+  }
+
+  return target
+}
+
+const distributePlayersByTarget = (
+  players: Player[],
+  teamIds: string[],
+  targetByTeamId: Map<string, number>,
+  prng: ReturnType<typeof createPrng>,
+): Map<string, string[]> => {
+  const byOverall = [...players].sort((a, b) => playerOverall(b) - playerOverall(a))
+  const assignments = new Map(teamIds.map((teamId) => [teamId, [] as string[]]))
+  const tierSize = teamIds.length
+
+  for (let tierStart = 0; tierStart < byOverall.length; tierStart += tierSize) {
+    const tier = shuffleWithPrng(byOverall.slice(tierStart, tierStart + tierSize), prng)
+    for (const player of tier) {
+      const candidates = teamIds
+        .filter((teamId) => (assignments.get(teamId)?.length ?? 0) < (targetByTeamId.get(teamId) ?? 0))
+        .sort((left, right) => {
+          const leftSize = assignments.get(left)?.length ?? 0
+          const rightSize = assignments.get(right)?.length ?? 0
+          if (leftSize === rightSize) {
+            return 0
+          }
+          return leftSize - rightSize
+        })
+      const bucket = candidates.slice(0, Math.min(3, candidates.length))
+      const selectedTeamId = bucket.length > 0 ? prng.pick(bucket) : candidates[0]
+      if (!selectedTeamId) {
+        continue
+      }
+      assignments.get(selectedTeamId)?.push(player.id)
+    }
+  }
+
+  return assignments
+}
+
+const assignSeededRosters = (
+  teams: Team[],
+  players: Player[],
+  config: LeagueConfig,
+  overseasCap: number,
+): {
+  rosterByTeamId: Map<string, string[]>
+  budgetRemainingByTeamId: Map<string, number>
+} => {
+  normalizeDomesticSupply(players, teams.length * (config.maxSquadSize - overseasCap))
+
+  const prng = createPrng(config.seasonSeed + 7_131)
+  const teamIds = teams.map((team) => team.id)
+  const overseasPlayers = players.filter((player) => player.countryTag !== 'IN')
+  const domesticPlayers = players.filter((player) => player.countryTag === 'IN')
+  const overseasTargetByTeamId = buildTargetByTeam(teamIds, overseasPlayers.length, overseasCap, prng)
+  const domesticTargetByTeamId = new Map(teamIds.map((teamId) => [teamId, config.maxSquadSize - (overseasTargetByTeamId.get(teamId) ?? 0)]))
+
+  const overseasAssignments = distributePlayersByTarget(overseasPlayers, teamIds, overseasTargetByTeamId, prng)
+  const domesticAssignments = distributePlayersByTarget(domesticPlayers, teamIds, domesticTargetByTeamId, prng)
+
+  const reassigned = new Map(
+    teamIds.map((teamId) => [
+      teamId,
+      shuffleWithPrng([...(overseasAssignments.get(teamId) ?? []), ...(domesticAssignments.get(teamId) ?? [])], prng),
+    ]),
+  )
+
+  const valueByPlayerId = new Map(players.map((player) => [player.id, seededMarketValue(player)]))
+  const budgetRemainingByTeamId = new Map<string, number>()
+  for (const team of teams) {
+    const roster = reassigned.get(team.id) ?? []
+    const impliedSpend = roster.reduce((total, playerId) => total + (valueByPlayerId.get(playerId) ?? 0), 0)
+    budgetRemainingByTeamId.set(team.id, Math.max(0, config.auctionBudget - impliedSpend))
+  }
+
+  return { rosterByTeamId: reassigned, budgetRemainingByTeamId }
+}
+
 export const orderPlayersForAuction = (players: Player[]): Array<{ playerId: string; phase: AuctionPhase }> => {
   const byOverall = [...players].sort((a, b) => playerOverall(b) - playerOverall(a))
   const marquee = new Set(byOverall.slice(0, Math.min(16, byOverall.length)).map((player) => player.id))
@@ -515,6 +696,79 @@ export const createInitialStateWithOptions = (seed: number, options: CreateIniti
       complete: false,
     },
     fixtures: [],
+    stats: {},
+  }
+}
+
+export const createSeededInitialStateWithOptions = (seed: number, options: CreateInitialStateOptions = {}): GameState => {
+  const resolvedPolicy = resolveAuctionPolicy(options.policyContext)
+  const nowIso = new Date().toISOString()
+  const createdAt = options.seasonStartIso ?? nowIso
+  const updatedAt = createdAt
+  const policySet = options.policyContext?.policySet ?? 'legacy-default'
+  const config: LeagueConfig = {
+    teamCount: 10,
+    format: 'T20',
+    policySet,
+    auctionBudget: resolvedPolicy.policy.purse,
+    minSquadSize: resolvedPolicy.policy.squadMin,
+    maxSquadSize: resolvedPolicy.policy.squadMax,
+    seasonSeed: seed,
+  }
+
+  const teams = generateTeams(config)
+  const players = generatePlayers(config)
+  const { rosterByTeamId, budgetRemainingByTeamId } = assignSeededRosters(teams, players, config, resolvedPolicy.policy.overseasCap)
+  const playerById = new Map(players.map((player) => [player.id, player]))
+
+  for (const team of teams) {
+    const rosterPlayerIds = rosterByTeamId.get(team.id) ?? []
+    for (const playerId of rosterPlayerIds) {
+      const player = playerById.get(playerId)
+      if (player) {
+        player.teamId = team.id
+      }
+    }
+    const rosterPlayers = rosterPlayerIds.map((playerId) => playerById.get(playerId)).filter((player): player is Player => Boolean(player))
+    const { playingXi, wicketkeeperPlayerId } = pickBalancedXi(rosterPlayers)
+    team.rosterPlayerIds = rosterPlayerIds
+    team.playingXi = playingXi
+    team.wicketkeeperPlayerId = wicketkeeperPlayerId
+    team.budgetRemaining = budgetRemainingByTeamId.get(team.id) ?? config.auctionBudget
+  }
+
+  return {
+    metadata: {
+      schemaVersion: 2,
+      engineVersion: '0.2.0',
+      seed,
+      createdAt,
+      updatedAt,
+    },
+    config,
+    simulation: {
+      deterministicCore: true,
+      liveViewNarrationMode: 'non_authoritative',
+    },
+    phase: 'preseason',
+    userTeamId: teams[0].id,
+    teams,
+    players,
+    auction: {
+      currentNominationIndex: 0,
+      phase: 'complete',
+      currentPlayerId: null,
+      currentBidTeamId: null,
+      currentBid: 0,
+      currentBidIncrement: 0,
+      passedTeamIds: [],
+      awaitingUserAction: false,
+      message: 'Season 1 is seeded. Auction is skipped this year.',
+      allowRtm: false,
+      entries: [],
+      complete: true,
+    },
+    fixtures: generateRoundRobinFixtures(teams, createdAt),
     stats: {},
   }
 }

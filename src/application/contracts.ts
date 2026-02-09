@@ -158,7 +158,7 @@ export const gameStateSchema = z.object({
     deterministicCore: z.boolean(),
     liveViewNarrationMode: z.literal('non_authoritative'),
   }),
-  phase: z.enum(['auction', 'regular-season', 'playoffs', 'complete']),
+  phase: z.enum(['auction', 'preseason', 'regular-season', 'playoffs', 'complete']),
   userTeamId: z.string(),
   teams: z.array(teamSchema),
   players: z.array(playerSchema),

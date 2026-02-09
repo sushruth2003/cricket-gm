@@ -1,14 +1,14 @@
 import { createLeague } from '@/application/useCases/createLeague'
 import { importSave } from '@/application/useCases/importSave'
-import { runAuction } from '@/application/useCases/runAuction'
 import { simulateNextFixture } from '@/application/useCases/simulateSeason'
+import { startSeason } from '@/application/useCases/startSeason'
 import { MemoryRepository } from '@/test/memoryRepository'
 
 describe('application integration flow', () => {
   it('runs preseason to first 3 fixtures', async () => {
     const repo = new MemoryRepository()
     let state = await createLeague(repo, 2026)
-    state = await runAuction(repo)
+    state = await startSeason(repo)
 
     expect(state.phase).toBe('regular-season')
     expect(state.fixtures.length).toBeGreaterThan(0)
@@ -37,7 +37,7 @@ describe('application integration flow', () => {
   it('simulates all matches on the next scheduled date', async () => {
     const repo = new MemoryRepository()
     let state = await createLeague(repo, 2027)
-    state = await runAuction(repo)
+    state = await startSeason(repo)
 
     const result = simulateNextFixture(state)
     const played = result.nextState.fixtures.filter((fixture) => fixture.played)

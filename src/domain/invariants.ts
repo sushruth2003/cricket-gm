@@ -1,4 +1,5 @@
 import { SimInvariantError, ValidationError } from '@/domain/errors'
+import { resolveAuctionPolicy } from '@/domain/policy/resolver'
 import type { GameState, MatchResult } from '@/domain/types'
 
 export const assertTeamBudgets = (state: GameState) => {
@@ -21,22 +22,24 @@ export const assertRosterSizes = (state: GameState) => {
 }
 
 export const assertOverseasCap = (state: GameState) => {
+  const policy = resolveAuctionPolicy().policy
   const playersById = new Map(state.players.map((player) => [player.id, player]))
   for (const team of state.teams) {
     const overseasCount = team.rosterPlayerIds.filter((playerId) => playersById.get(playerId)?.countryTag !== 'IN').length
-    if (overseasCount > 8) {
+    if (overseasCount > policy.overseasCap) {
       throw new ValidationError(`Team ${team.name} exceeds overseas player cap`)
     }
   }
 }
 
 export const assertMinimumSpend = (state: GameState) => {
+  const policy = resolveAuctionPolicy().policy
   if (!state.auction.complete) {
     return
   }
   for (const team of state.teams) {
     const spent = state.config.auctionBudget - team.budgetRemaining
-    if (spent < 9_000) {
+    if (spent < policy.minimumSpend) {
       throw new ValidationError(`Team ${team.name} failed minimum spend requirement`)
     }
   }

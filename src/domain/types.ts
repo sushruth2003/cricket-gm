@@ -1,6 +1,8 @@
 export type Phase = 'auction' | 'regular-season' | 'playoffs' | 'complete'
 export type AuctionPhase = 'marquee' | 'capped' | 'uncapped' | 'accelerated-1' | 'accelerated-2' | 'complete'
 export type AuctionEntryStatus = 'pending' | 'sold' | 'unsold'
+export type AuctionType = 'mega' | 'mini'
+export type AuctionPolicySet = 'legacy-default' | 'ipl-2025-cycle'
 
 export type BowlingStyle = 'pace' | 'spin'
 export type PlayerRole = 'batter' | 'bowler' | 'wicketkeeper' | 'allrounder'
@@ -108,6 +110,57 @@ export interface AuctionEntry {
   status: AuctionEntryStatus
   soldToTeamId: string | null
   finalPrice: number
+}
+
+export interface AuctionBidIncrementBand {
+  minBid: number
+  increment: number
+}
+
+export interface AuctionPolicy {
+  key: string
+  auctionType: AuctionType
+  purse: number
+  squadMin: number
+  squadMax: number
+  overseasCap: number
+  minimumSpend: number
+  minimumPlayerBase: number
+  retentionLimit: number
+  retentionEnabled: boolean
+  rtmEnabled: boolean
+  rtmReboundEnabled: boolean
+  forceFillToMinimumSquad: boolean
+  bidIncrementBands: AuctionBidIncrementBand[]
+  phaseIncrementFloor: Record<Exclude<AuctionPhase, 'complete'>, number>
+}
+
+export interface AuctionPolicyContext {
+  policySet?: AuctionPolicySet
+  seasonYear?: number
+  seasonIndex?: number
+  cycleMarker?: number
+}
+
+export interface ResolvedAuctionPolicy {
+  seasonYear: number
+  auctionType: AuctionType
+  policy: AuctionPolicy
+}
+
+export interface AuctionRetentionState {
+  enabled: boolean
+  maxRetentions: number
+  phase: 'not-applicable' | 'pending' | 'complete'
+}
+
+export interface AuctionRtmDecision {
+  enabled: boolean
+  allowRebound: boolean
+  phase: 'disabled' | 'available' | 'completed'
+  incumbentTeamId: string | null
+  winningTeamId: string
+  finalBid: number
 }
 
 export interface AuctionState {

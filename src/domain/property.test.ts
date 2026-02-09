@@ -1,6 +1,7 @@
 import fc from 'fast-check'
 import { runAutoAuction } from '@/domain/auction'
 import { createInitialState } from '@/domain/generator'
+import { resolveAuctionPolicy } from '@/domain/policy/resolver'
 import { generateRoundRobinFixtures } from '@/domain/schedule'
 import { simulateNextFixture } from '@/application/useCases/simulateSeason'
 
@@ -12,9 +13,15 @@ describe('property checks', () => {
       fc.property(fc.integer({ min: 1, max: 10_000 }), (seed) => {
         const state = createInitialState(seed)
         const next = runAutoAuction(state)
+        const policy = resolveAuctionPolicy().policy
+        const playerById = new Map(next.players.map((player) => [player.id, player]))
 
         return next.teams.every(
-          (team) => team.budgetRemaining >= 0 && team.rosterPlayerIds.length <= next.config.maxSquadSize,
+          (team) =>
+            team.budgetRemaining >= 0 &&
+            team.rosterPlayerIds.length >= policy.squadMin &&
+            team.rosterPlayerIds.length <= policy.squadMax &&
+            team.rosterPlayerIds.filter((playerId) => playerById.get(playerId)?.countryTag !== 'IN').length <= policy.overseasCap,
         )
       }),
       { numRuns: 20 },

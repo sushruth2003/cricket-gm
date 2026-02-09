@@ -1,4 +1,6 @@
 import { createPrng } from '@/domain/prng'
+import { getAuctionOpeningMessage } from '@/domain/auction/policyHooks'
+import { resolveAuctionPolicy } from '@/domain/policy/resolver'
 import type {
   AuctionPhase,
   BattingTrait,
@@ -446,12 +448,13 @@ const orderPlayersForAuction = (players: Player[]): Array<{ playerId: string; ph
 }
 
 export const createInitialState = (seed: number): GameState => {
+  const resolvedPolicy = resolveAuctionPolicy()
   const config: LeagueConfig = {
     teamCount: 10,
     format: 'T20',
-    auctionBudget: 12_000,
-    minSquadSize: 18,
-    maxSquadSize: 25,
+    auctionBudget: resolvedPolicy.policy.purse,
+    minSquadSize: resolvedPolicy.policy.squadMin,
+    maxSquadSize: resolvedPolicy.policy.squadMax,
     seasonSeed: seed,
   }
 
@@ -487,8 +490,8 @@ export const createInitialState = (seed: number): GameState => {
       currentBidIncrement: firstPlayerBase,
       passedTeamIds: [],
       awaitingUserAction: true,
-      message: 'Free-for-all opening auction (Season 1): no RTM or retention rights.',
-      allowRtm: false,
+      message: getAuctionOpeningMessage(resolvedPolicy),
+      allowRtm: resolvedPolicy.policy.rtmEnabled,
       entries: entries.map((entry) => ({
         playerId: entry.playerId,
         phase: entry.phase,

@@ -6,6 +6,10 @@ export interface AuctionEntryView {
   phase: string
   status: string
   basePrice: number
+  battingRating: number
+  bowlingRating: number
+  fieldingRating: number
+  overallRating: number
   lastSeasonMatches: number
   lastSeasonRuns: number
   lastSeasonWickets: number
@@ -27,6 +31,12 @@ export const toAuctionView = (auction: AuctionState, players: Player[], teams: T
       phase: entry.phase,
       status: entry.status,
       basePrice: player?.basePrice ?? 0,
+      battingRating: player?.ratings.batting.overall ?? 0,
+      bowlingRating: player?.ratings.bowling.overall ?? 0,
+      fieldingRating: player?.ratings.fielding.overall ?? 0,
+      overallRating: player
+        ? Math.round((player.ratings.batting.overall + player.ratings.bowling.overall + player.ratings.fielding.overall) / 3)
+        : 0,
       lastSeasonMatches: player?.lastSeasonStats.matches ?? 0,
       lastSeasonRuns: player?.lastSeasonStats.runs ?? 0,
       lastSeasonWickets: player?.lastSeasonStats.wickets ?? 0,

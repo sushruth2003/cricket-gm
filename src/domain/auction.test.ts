@@ -161,6 +161,49 @@ describe('auction state machine scenarios', () => {
     expect(next.auction.entries[0].soldToTeamId).toBeNull()
   })
 
+  it('auto mode prioritizes missing wicketkeeper role', () => {
+    const wicketkeeper = makePlayer('wk-1', 30, 'IN', 'wicketkeeper')
+    wicketkeeper.ratings = {
+      ...wicketkeeper.ratings,
+      batting: { ...wicketkeeper.ratings.batting, overall: 66 },
+      bowling: { ...wicketkeeper.ratings.bowling, overall: 32 },
+      fielding: { ...wicketkeeper.ratings.fielding, traits: { ...wicketkeeper.ratings.fielding.traits, wicketkeeping: 92 } },
+    }
+    const userTeam = makeTeam('team-1', 12_000)
+    const aiTeam = makeTeam('team-2', 100)
+    const state = makeState([wicketkeeper], [userTeam, aiTeam])
+
+    const next = progressAuction(state, 'auto')
+    expect(next.auction.entries[0].status).toBe('sold')
+    expect(next.auction.entries[0].soldToTeamId).toBe('team-1')
+  })
+
+  it('auto mode passes when bid exceeds value ceiling', () => {
+    const expensiveBatter = makePlayer('star-1', 3_000, 'IN', 'batter')
+    expensiveBatter.ratings = {
+      ...expensiveBatter.ratings,
+      batting: { ...expensiveBatter.ratings.batting, overall: 52 },
+      bowling: { ...expensiveBatter.ratings.bowling, overall: 28 },
+      fielding: { ...expensiveBatter.ratings.fielding, overall: 45 },
+      fitness: 44,
+      temperament: 43,
+    }
+    expensiveBatter.lastSeasonStats = {
+      matches: 8,
+      runs: 92,
+      wickets: 0,
+      strikeRate: 108,
+      economy: 12.4,
+    }
+    const userTeam = makeTeam('team-1', 3_500)
+    const aiTeam = makeTeam('team-2', 2_900)
+    const state = makeState([expensiveBatter], [userTeam, aiTeam])
+
+    const next = progressAuction(state, 'auto')
+    expect(next.auction.entries[0].status).toBe('unsold')
+    expect(next.auction.entries[0].soldToTeamId).toBeNull()
+  })
+
   it('rejects user overseas bid when cap is reached', () => {
     const cap = resolveAuctionPolicy().policy.overseasCap
     const overseasRoster = Array.from({ length: cap }, (_, index) => makePlayer(`ov-${index + 1}`, 30, 'AUS'))

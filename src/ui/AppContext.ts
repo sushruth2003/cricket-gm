@@ -24,6 +24,7 @@ export interface AppContextValue {
     auctionBid: () => Promise<void>
     auctionPass: () => Promise<void>
     auctionAuto: () => Promise<void>
+    auctionSkipToPlayer: (playerId: string) => Promise<void>
     startSeason: () => Promise<void>
     simulateMatch: () => Promise<void>
     simulateSeason: () => Promise<void>

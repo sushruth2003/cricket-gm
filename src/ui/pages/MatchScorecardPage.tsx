@@ -151,28 +151,35 @@ export const MatchScorecardPage = () => {
   }
 
   return (
-    <section className="scorecardPage">
-      <header className="scorecardHeader">
-        <div>
-          <p className="scorecardRound">Round {match.round}</p>
-          <h2>
-            {homeTeam?.name ?? 'Home'} vs {awayTeam?.name ?? 'Away'}
-          </h2>
-          <p className="scorecardResult">{match.played ? match.margin : 'Match not played yet'}</p>
-        </div>
-        <Link className="fixtureBackLink" to="/fixtures">
-          Back to fixtures
-        </Link>
+    <>
+      <header className="pageHeader">
+        <h1 className="pageTitle">Match Scorecard</h1>
+        <p className="pageMeta">Innings-by-innings batting and bowling breakdown.</p>
       </header>
 
-      {!match.played || !match.innings ? (
-        <section className="card">
-          <h3>Scorecard unavailable</h3>
-          <p>Simulate this fixture to generate innings-level stats.</p>
-        </section>
-      ) : (
-        <div className="inningsStack">{match.innings.map(renderInnings)}</div>
-      )}
-    </section>
+      <section className="scorecardPage">
+        <header className="scorecardHeader">
+          <div>
+            <p className="scorecardRound">Round {match.round}</p>
+            <h2>
+              {homeTeam?.name ?? 'Home'} vs {awayTeam?.name ?? 'Away'}
+            </h2>
+            <p className="scorecardResult">{match.played ? match.margin : 'Match not played yet'}</p>
+          </div>
+          <Link className="fixtureBackLink" to="/fixtures">
+            Back to fixtures
+          </Link>
+        </header>
+
+        {!match.played || !match.innings ? (
+          <section className="card">
+            <h3>Scorecard unavailable</h3>
+            <p>Simulate this fixture to generate innings-level stats.</p>
+          </section>
+        ) : (
+          <div className="inningsStack">{match.innings.map(renderInnings)}</div>
+        )}
+      </section>
+    </>
   )
 }

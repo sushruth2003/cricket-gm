@@ -33,18 +33,28 @@ export const SettingsPage = () => {
   }
 
   return (
-    <section className="card">
-      <h2>Settings</h2>
-      <p>This project only generates fictional players and teams.</p>
-      <p className="legal">No affiliation with IPL franchises or real players.</p>
-      <div className="actions">
-        <button onClick={() => void handleExport()}>Export Save</button>
-        <label className="fileInput">
-          Import Save
-          <input type="file" accept="application/json" onChange={handleImport} />
-        </label>
-      </div>
-      {message && <p>{message}</p>}
-    </section>
+    <>
+      <header className="pageHeader">
+        <h1 className="pageTitle">Settings</h1>
+        <p className="pageMeta">Save management and project disclaimer.</p>
+      </header>
+
+      <section className="panel">
+        <div className="panelBody">
+          <p className="muted">This project only generates fictional players and teams.</p>
+          <p className="legal">No affiliation with IPL franchises or real players.</p>
+          <div className="actions">
+            <button className="btnSecondary" onClick={() => void handleExport()}>
+              Export Save
+            </button>
+            <label className="fileInput btnGhost">
+              Import Save
+              <input type="file" accept="application/json" onChange={handleImport} />
+            </label>
+          </div>
+          {message && <p className="chip chipInfo">{message}</p>}
+        </div>
+      </section>
+    </>
   )
 }

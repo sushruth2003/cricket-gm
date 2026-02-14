@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useApp } from '@/ui/useApp'
 
@@ -25,6 +25,7 @@ const navGroups: NavGroup[] = [
   {
     title: 'Team',
     items: [
+      { to: '/schedule', label: 'Schedule' },
       { to: '/roster', label: 'Roster' },
       { to: '/auction', label: 'Auction' },
     ],
@@ -41,6 +42,8 @@ export const Layout = () => {
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [isPlayMenuOpen, setIsPlayMenuOpen] = useState(false)
+  const playMenuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 900px)')
@@ -57,6 +60,31 @@ export const Layout = () => {
 
     return () => {
       media.removeEventListener('change', onMediaChange)
+    }
+  }, [])
+
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent) => {
+      if (!playMenuRef.current) {
+        return
+      }
+      if (!(event.target instanceof Node)) {
+        return
+      }
+      if (!playMenuRef.current.contains(event.target)) {
+        setIsPlayMenuOpen(false)
+      }
+    }
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsPlayMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onEscape)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onEscape)
     }
   }, [])
 
@@ -112,6 +140,9 @@ export const Layout = () => {
     setIsDesktopCollapsed((current) => !current)
   }
 
+  const canSimulate = Boolean(state && (state.phase === 'regular-season' || state.phase === 'playoffs'))
+  const canSimToRegularSeasonEnd = Boolean(state && state.phase === 'regular-season')
+
   return (
     <div className={layoutClassName}>
       <header className="topbar">
@@ -125,9 +156,70 @@ export const Layout = () => {
           </div>
         </div>
         <div className="topbarCenter">
-          <button className="playControl" type="button" onClick={() => navigate('/fixtures')}>
-            Play ▾
-          </button>
+          <div className="playMenu" ref={playMenuRef}>
+            <button
+              className="playControl"
+              type="button"
+              onClick={() => setIsPlayMenuOpen((current) => !current)}
+              aria-haspopup="menu"
+              aria-expanded={isPlayMenuOpen}
+              disabled={!state || saving}
+            >
+              Play ▾
+            </button>
+            {isPlayMenuOpen ? (
+              <div className="playMenuList" role="menu" aria-label="Simulation options">
+                <button
+                  type="button"
+                  className="playMenuItem"
+                  role="menuitem"
+                  onClick={async () => {
+                    setIsPlayMenuOpen(false)
+                    await actions.simulateMatch()
+                  }}
+                  disabled={!canSimulate}
+                >
+                  Sim to Next Game
+                </button>
+                <button
+                  type="button"
+                  className="playMenuItem"
+                  role="menuitem"
+                  onClick={async () => {
+                    setIsPlayMenuOpen(false)
+                    await actions.simulateMatches(2)
+                  }}
+                  disabled={!canSimulate}
+                >
+                  Sim 2 Games
+                </button>
+                <button
+                  type="button"
+                  className="playMenuItem"
+                  role="menuitem"
+                  onClick={async () => {
+                    setIsPlayMenuOpen(false)
+                    await actions.simulateMatches(5)
+                  }}
+                  disabled={!canSimulate}
+                >
+                  Sim 5 Games
+                </button>
+                <button
+                  type="button"
+                  className="playMenuItem"
+                  role="menuitem"
+                  onClick={async () => {
+                    setIsPlayMenuOpen(false)
+                    await actions.simulateToRegularSeasonEnd()
+                  }}
+                  disabled={!canSimToRegularSeasonEnd}
+                >
+                  Sim to End of Regular Season
+                </button>
+              </div>
+            ) : null}
+          </div>
           <div className="phaseInfo">
             <strong>{state ? `${state.phase} · ${userTeam?.shortName ?? 'No team'}` : 'No active league'}</strong>
             <p className="phaseSub">{resultText}</p>
@@ -135,6 +227,7 @@ export const Layout = () => {
         </div>
         <div className="topbarRight">
           <NavLink to="/standings">League</NavLink>
+          <NavLink to="/schedule">Schedule</NavLink>
           <NavLink to="/roster">Team</NavLink>
           <NavLink to="/stats">Players</NavLink>
           <NavLink to="/settings">Tools</NavLink>

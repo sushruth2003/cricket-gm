@@ -119,6 +119,42 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       simulateMatch: async () => {
         await mutation.mutateAsync(async () => services.simulateOneMatch(resolvedActiveLeagueId ?? undefined))
       },
+      simulateMatches: async (count: number) => {
+        const target = Math.max(1, Math.floor(count))
+        await mutation.mutateAsync(async () => {
+          let latest: GameState | null = null
+          for (let index = 0; index < target; index += 1) {
+            const next = await services.simulateOneMatch(resolvedActiveLeagueId ?? undefined)
+            latest = next
+            queryClient.setQueryData([...STATE_QUERY_KEY, resolvedActiveLeagueId], next)
+            if (next.phase === 'complete') {
+              break
+            }
+          }
+          if (!latest) {
+            throw new Error('No matches were simulated')
+          }
+          return latest
+        })
+      },
+      simulateToRegularSeasonEnd: async () => {
+        await mutation.mutateAsync(async () => {
+          let current = await services.getState(resolvedActiveLeagueId ?? undefined)
+          if (!current) {
+            throw new Error('No league loaded')
+          }
+          if (current.phase !== 'regular-season') {
+            return current
+          }
+
+          while (current.phase === 'regular-season') {
+            current = await services.simulateOneMatch(resolvedActiveLeagueId ?? undefined)
+            queryClient.setQueryData([...STATE_QUERY_KEY, resolvedActiveLeagueId], current)
+          }
+
+          return current
+        })
+      },
       simulateSeason: async () => {
         const abortController = new AbortController()
         await mutation.mutateAsync(async () => {

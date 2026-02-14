@@ -20,6 +20,32 @@ const toEconomy = (line: PlayerBowlingLine) => {
   return (line.runsConceded / line.overs).toFixed(2)
 }
 
+const toDismissalLabel = (line: PlayerBattingLine, playersById: Map<string, { firstName: string; lastName: string }>) => {
+  if (!line.out) {
+    return 'not out'
+  }
+
+  const dismissedBy = line.dismissedByPlayerId ? playersById.get(line.dismissedByPlayerId) : null
+  const assistedBy = line.assistedByPlayerId ? playersById.get(line.assistedByPlayerId) : null
+  const dismissedByName = toName(dismissedBy?.firstName, dismissedBy?.lastName)
+  const assistedByName = toName(assistedBy?.firstName, assistedBy?.lastName)
+
+  switch (line.dismissalKind) {
+    case 'caught':
+      return `c ${assistedByName} b ${dismissedByName}`
+    case 'bowled':
+      return `b ${dismissedByName}`
+    case 'caught-and-bowled':
+      return `c&b ${dismissedByName}`
+    case 'lbw':
+      return `lbw b ${dismissedByName}`
+    case 'run-out':
+      return `run out (${dismissedByName})`
+    default:
+      return 'out'
+  }
+}
+
 export const MatchScorecardPage = () => {
   const { matchId } = useParams<{ matchId: string }>()
   const { state } = useApp()
@@ -81,7 +107,7 @@ export const MatchScorecardPage = () => {
                 return (
                   <tr key={line.playerId}>
                     <td>{toName(player?.firstName, player?.lastName)}</td>
-                    <td>{line.out ? 'out' : 'not out'}</td>
+                    <td>{toDismissalLabel(line, playersById)}</td>
                     <td>{line.runs}</td>
                     <td>{line.balls}</td>
                     <td>{line.fours}</td>

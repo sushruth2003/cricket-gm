@@ -1,4 +1,5 @@
 import { createPrng } from '@/domain/prng'
+import { faker } from '@faker-js/faker'
 import { getAuctionOpeningMessage } from '@/domain/auction/policyHooks'
 import { resolveAuctionPolicy } from '@/domain/policy/resolver'
 import { generateRoundRobinFixtures } from '@/domain/schedule'
@@ -55,50 +56,6 @@ const countryTags = [
   'SA',
   'WI',
 ]
-const firstNames = [
-  'Aariv',
-  'Kabir',
-  'Ishaan',
-  'Arjun',
-  'Sam',
-  'Noah',
-  'Liam',
-  'Owen',
-  'Finn',
-  'Theo',
-  'Ethan',
-  'Jacob',
-  'Mason',
-  'Aiden',
-  'Rayan',
-  'Tariq',
-  'Kane',
-  'Tristan',
-  'Marco',
-  'Keon',
-]
-const lastNames = [
-  'Madan',
-  'Rawat',
-  'Bisht',
-  'Perera',
-  'Rahman',
-  'Khan',
-  'Patel',
-  'Sharma',
-  'Clarke',
-  'Turner',
-  'Miller',
-  'Smith',
-  'Brown',
-  'Taylor',
-  'OConnell',
-  'van Dyk',
-  'Samuels',
-  'Ndlovu',
-  'Fletcher',
-  'Reid',
-]
 const colors = ['#0b1f3a', '#9d1d20', '#1f6f8b', '#f4a300', '#2f5233', '#702963', '#4b6cb7', '#7b241c', '#2e4053', '#0e6655']
 const basePriceTiers = [200, 150, 125, 100, 75, 50, 40, 30]
 const roleWeights: Array<{ role: PlayerRole; weight: number }> = [
@@ -111,6 +68,67 @@ const roleWeights: Array<{ role: PlayerRole; weight: number }> = [
 const clamp = (value: number, min = 20, max = 99) => Math.max(min, Math.min(max, value))
 
 const average = (values: number[]) => Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+
+const sanitizeNamePart = (value: string): string =>
+  value
+    .normalize('NFKD')
+    .split('')
+    .filter((char) => char.charCodeAt(0) <= 0x7f)
+    .join('')
+    .replace(/[^A-Za-z' -]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const buildNamePool = (seed: number, mode: 'first' | 'last', size: number): string[] => {
+  faker.seed(seed)
+  const names = new Set<string>()
+
+  while (names.size < size) {
+    const raw = mode === 'first' ? faker.person.firstName() : faker.person.lastName()
+    const name = sanitizeNamePart(raw)
+    if (name) {
+      names.add(name)
+    }
+  }
+
+  return [...names]
+}
+
+const firstNamePool = buildNamePool(1_904, 'first', 512)
+const lastNamePool = buildNamePool(7_312, 'last', 768)
+
+const generateUniquePlayerName = (
+  prng: ReturnType<typeof createPrng>,
+  index: number,
+  usedFullNames: Set<string>,
+): { firstName: string; lastName: string } => {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const firstName = prng.pick(firstNamePool)
+    const lastName = prng.pick(lastNamePool)
+
+    const fullName = `${firstName} ${lastName}`
+    if (!usedFullNames.has(fullName)) {
+      usedFullNames.add(fullName)
+      return { firstName, lastName }
+    }
+  }
+
+  const fallbackFirstName = `Player${index + 1}`
+  const fallbackLastName = 'Generated'
+  let suffix = 1
+  let fallbackFullName = `${fallbackFirstName} ${fallbackLastName}`
+  while (usedFullNames.has(fallbackFullName)) {
+    suffix += 1
+    fallbackFullName = `${fallbackFirstName}${suffix} ${fallbackLastName}`
+  }
+  usedFullNames.add(fallbackFullName)
+
+  const [firstName, ...lastParts] = fallbackFullName.split(' ')
+  return {
+    firstName,
+    lastName: lastParts.join(' '),
+  }
+}
 
 const makeSkillRating = <TTrait extends string>(
   base: number,
@@ -364,9 +382,11 @@ export const generateTeams = (config: LeagueConfig): Team[] => {
 
 export const generatePlayers = (config: LeagueConfig): Player[] => {
   const prng = createPrng(config.seasonSeed + 101)
+  const namePrng = createPrng(config.seasonSeed + 81_337)
   const poolSize = config.teamCount * config.maxSquadSize
   const prospectCount = calculateProspectCount(poolSize, config.teamCount)
   const firstProspectIndex = poolSize - prospectCount
+  const usedFullNames = new Set<string>()
 
   return Array.from({ length: poolSize }, (_, index) => {
     const base = prng.nextInt(35, 88)
@@ -381,11 +401,12 @@ export const generatePlayers = (config: LeagueConfig): Player[] => {
     const ratings = isProspect ? regressProspectRatings(tunedRatings, prng) : tunedRatings
     const capped = isProspect ? false : !isIndian || prng.next() > 0.45
     const potential = isProspect ? projectPotential(ratings, prng) : null
+    const name = generateUniquePlayerName(namePrng, index, usedFullNames)
 
     return {
       id: `player-${index + 1}`,
-      firstName: prng.pick(firstNames),
-      lastName: prng.pick(lastNames),
+      firstName: name.firstName,
+      lastName: name.lastName,
       countryTag,
       capped,
       role,

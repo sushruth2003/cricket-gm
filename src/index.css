@@ -121,6 +121,13 @@ input {
   display: flex;
   align-items: center;
   min-width: 0;
+  overflow: visible;
+}
+
+.playMenu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
 }
 
 .playControl {
@@ -130,6 +137,34 @@ input {
   border-right: 1px solid rgba(0, 0, 0, 0.2);
   padding: 0.55rem 0.95rem;
   font-weight: 700;
+}
+
+.playMenuList {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 50;
+  min-width: 15.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: #27313d;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35);
+  padding: 0.35rem;
+}
+
+.playMenuItem {
+  text-align: left;
+  border: 1px solid #445161;
+  background: #313b48;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.playMenuItem:hover {
+  background: #3a4655;
 }
 
 .phaseInfo {

@@ -186,6 +186,9 @@ export interface PlayerBattingLine {
   fours: number
   sixes: number
   out: boolean
+  dismissalKind: 'caught' | 'bowled' | 'caught-and-bowled' | 'lbw' | 'run-out' | null
+  dismissedByPlayerId: string | null
+  assistedByPlayerId: string | null
 }
 
 export interface PlayerBowlingLine {

@@ -61,131 +61,147 @@ export const FixturesPage = () => {
   const champion = final?.played && final.winnerTeamId ? (teamNameById.get(final.winnerTeamId) ?? 'TBD') : null
 
   if (!state) {
-    return <p className="card">Create a league first.</p>
+    return <p className="panel panelBody">Create a league first.</p>
   }
   const canSimulate = state.phase === 'regular-season' || state.phase === 'playoffs'
 
   return (
-    <section className="card">
-      <div className="fixturesHeader">
-        <h2>Fixtures</h2>
-        <div className="viewToggle" role="tablist" aria-label="Fixture display">
-          <button type="button" onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'active' : ''}>
-            List View
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('bracket')}
-            className={viewMode === 'bracket' ? 'active' : ''}
-            disabled={!hasPlayoffFixtures}
-            title={hasPlayoffFixtures ? 'Show playoff bracket' : 'Bracket appears once playoffs are scheduled'}
-          >
-            Playoff Bracket
-          </button>
-        </div>
-      </div>
-      <div className="actions">
-        <button onClick={() => actions.simulateMatch()} disabled={!canSimulate}>
-          Sim Next Date
-        </button>
-        <button onClick={() => actions.simulateSeason()} disabled={!canSimulate}>
-          Sim Remaining
-        </button>
-      </div>
-      {viewMode === 'bracket' && hasPlayoffFixtures ? (
-        <div className="playoffBracketWrap">
-          <div className="playoffBracket">
-            <section className="bracketColumn">
-              <h3>Qualifier Stage</h3>
-              <article className="playoffMatchCard">
-                <p className="playoffMatchLabel">Qualifier 1</p>
-                <p>{qualifier1Home}</p>
-                <p>{qualifier1Away}</p>
-                <p className="playoffStatus">{getFixtureStatus(qualifier1)}</p>
-                {qualifier1 ? (
-                  <Link className="fixtureLink" to={`/fixtures/${qualifier1.id}`}>
-                    {qualifier1.played ? 'Scorecard' : 'Preview'}
-                  </Link>
-                ) : null}
-              </article>
-              <article className="playoffMatchCard">
-                <p className="playoffMatchLabel">Eliminator</p>
-                <p>{eliminatorHome}</p>
-                <p>{eliminatorAway}</p>
-                <p className="playoffStatus">{getFixtureStatus(eliminator)}</p>
-                {eliminator ? (
-                  <Link className="fixtureLink" to={`/fixtures/${eliminator.id}`}>
-                    {eliminator.played ? 'Scorecard' : 'Preview'}
-                  </Link>
-                ) : null}
-              </article>
-            </section>
-            <section className="bracketColumn">
-              <h3>Qualifier 2</h3>
-              <article className="playoffMatchCard">
-                <p className="playoffMatchLabel">Challenger</p>
-                <p>{qualifier2Home}</p>
-                <p>{qualifier2Away}</p>
-                <p className="playoffStatus">{getFixtureStatus(qualifier2)}</p>
-                {qualifier2 ? (
-                  <Link className="fixtureLink" to={`/fixtures/${qualifier2.id}`}>
-                    {qualifier2.played ? 'Scorecard' : 'Preview'}
-                  </Link>
-                ) : null}
-              </article>
-            </section>
-            <section className="bracketColumn">
-              <h3>Final</h3>
-              <article className="playoffMatchCard">
-                <p className="playoffMatchLabel">Championship</p>
-                <p>{finalHome}</p>
-                <p>{finalAway}</p>
-                <p className="playoffStatus">{getFixtureStatus(final)}</p>
-                {final ? (
-                  <Link className="fixtureLink" to={`/fixtures/${final.id}`}>
-                    {final.played ? 'Scorecard' : 'Preview'}
-                  </Link>
-                ) : null}
-              </article>
-              <article className="playoffChampionCard">
-                <p className="playoffMatchLabel">Champion</p>
-                <strong>{champion ?? 'To be decided'}</strong>
-              </article>
-            </section>
+    <>
+      <header className="pageHeader">
+        <h1 className="pageTitle">Fixtures</h1>
+        <p className="pageMeta">Sim upcoming games or inspect completed scorecards.</p>
+      </header>
+
+      <section className="panel">
+        <div className="panelBody">
+          <div className="fixturesHeader">
+            <div className="controlRow">
+              <span className="chip chipInfo">{state.phase}</span>
+              <span className="chip chipWarning">{views.matches.length} matches</span>
+            </div>
+            <div className="viewToggle" role="tablist" aria-label="Fixture display">
+              <button type="button" onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'active' : ''}>
+                List View
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('bracket')}
+                className={viewMode === 'bracket' ? 'active' : ''}
+                disabled={!hasPlayoffFixtures}
+                title={hasPlayoffFixtures ? 'Show playoff bracket' : 'Bracket appears once playoffs are scheduled'}
+              >
+                Playoff Bracket
+              </button>
+            </div>
           </div>
+
+          <div className="actions">
+            <button className="btnSuccess" onClick={() => actions.simulateMatch()} disabled={!canSimulate}>
+              Sim Next Date
+            </button>
+            <button className="btnPrimary" onClick={() => actions.simulateSeason()} disabled={!canSimulate}>
+              Sim Remaining
+            </button>
+          </div>
+
+          {viewMode === 'bracket' && hasPlayoffFixtures ? (
+            <div className="playoffBracketWrap">
+              <div className="playoffBracket">
+                <section className="bracketColumn">
+                  <h3>Qualifier Stage</h3>
+                  <article className="playoffMatchCard">
+                    <p className="playoffMatchLabel">Qualifier 1</p>
+                    <p>{qualifier1Home}</p>
+                    <p>{qualifier1Away}</p>
+                    <p className="playoffStatus">{getFixtureStatus(qualifier1)}</p>
+                    {qualifier1 ? (
+                      <Link className="fixtureLink" to={`/fixtures/${qualifier1.id}`}>
+                        {qualifier1.played ? 'Scorecard' : 'Preview'}
+                      </Link>
+                    ) : null}
+                  </article>
+                  <article className="playoffMatchCard">
+                    <p className="playoffMatchLabel">Eliminator</p>
+                    <p>{eliminatorHome}</p>
+                    <p>{eliminatorAway}</p>
+                    <p className="playoffStatus">{getFixtureStatus(eliminator)}</p>
+                    {eliminator ? (
+                      <Link className="fixtureLink" to={`/fixtures/${eliminator.id}`}>
+                        {eliminator.played ? 'Scorecard' : 'Preview'}
+                      </Link>
+                    ) : null}
+                  </article>
+                </section>
+
+                <section className="bracketColumn">
+                  <h3>Qualifier 2</h3>
+                  <article className="playoffMatchCard">
+                    <p className="playoffMatchLabel">Challenger</p>
+                    <p>{qualifier2Home}</p>
+                    <p>{qualifier2Away}</p>
+                    <p className="playoffStatus">{getFixtureStatus(qualifier2)}</p>
+                    {qualifier2 ? (
+                      <Link className="fixtureLink" to={`/fixtures/${qualifier2.id}`}>
+                        {qualifier2.played ? 'Scorecard' : 'Preview'}
+                      </Link>
+                    ) : null}
+                  </article>
+                </section>
+
+                <section className="bracketColumn">
+                  <h3>Final</h3>
+                  <article className="playoffMatchCard">
+                    <p className="playoffMatchLabel">Championship</p>
+                    <p>{finalHome}</p>
+                    <p>{finalAway}</p>
+                    <p className="playoffStatus">{getFixtureStatus(final)}</p>
+                    {final ? (
+                      <Link className="fixtureLink" to={`/fixtures/${final.id}`}>
+                        {final.played ? 'Scorecard' : 'Preview'}
+                      </Link>
+                    ) : null}
+                  </article>
+                  <article className="playoffChampionCard">
+                    <p className="playoffMatchLabel">Champion</p>
+                    <strong>{champion ?? 'To be decided'}</strong>
+                  </article>
+                </section>
+              </div>
+            </div>
+          ) : (
+            <div className="tableShell">
+              <table className="dataTable">
+                <thead>
+                  <tr>
+                    <th className="numCell">Round</th>
+                    <th>Date</th>
+                    <th>Home</th>
+                    <th>Away</th>
+                    <th>Status</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {views.matches.map((match) => (
+                    <tr key={match.id} className={match.played ? '' : 'rowMuted'}>
+                      <td className="numCell">{match.round}</td>
+                      <td>{match.scheduledAt ?? 'TBD'}</td>
+                      <td>{state.teams.find((team) => team.id === match.homeTeamId)?.shortName}</td>
+                      <td>{state.teams.find((team) => team.id === match.awayTeamId)?.shortName}</td>
+                      <td>{match.played ? match.margin : 'Pending'}</td>
+                      <td>
+                        <Link className="fixtureLink" to={`/fixtures/${match.id}`}>
+                          {match.played ? 'Scorecard' : 'Preview'}
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="tableWrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Round</th>
-                <th>Date</th>
-                <th>Home</th>
-                <th>Away</th>
-                <th>Status</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {views.matches.map((match) => (
-                <tr key={match.id}>
-                  <td>{match.round}</td>
-                  <td>{match.scheduledAt ?? 'TBD'}</td>
-                  <td>{state.teams.find((team) => team.id === match.homeTeamId)?.shortName}</td>
-                  <td>{state.teams.find((team) => team.id === match.awayTeamId)?.shortName}</td>
-                  <td>{match.played ? match.margin : 'Pending'}</td>
-                  <td>
-                    <Link className="fixtureLink" to={`/fixtures/${match.id}`}>
-                      {match.played ? 'Scorecard' : 'Preview'}
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+      </section>
+    </>
   )
 }

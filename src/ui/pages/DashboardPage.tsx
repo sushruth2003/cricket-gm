@@ -6,12 +6,18 @@ export const DashboardPage = () => {
 
   if (!state) {
     return (
-      <section className="card">
-        <h2>Welcome</h2>
-        <p>Create a new fictional league to begin.</p>
-        <div className="actions">
-          <button onClick={() => actions.createOrLoadLeague()}>Create League</button>
-          <button onClick={() => actions.createLeague()}>Create Additional League</button>
+      <section className="panel">
+        <div className="panelBody">
+          <h2>Welcome</h2>
+          <p className="muted">Create a new fictional league to begin.</p>
+          <div className="actions">
+            <button className="btnSuccess" onClick={() => actions.createOrLoadLeague()}>
+              Create League
+            </button>
+            <button className="btnSecondary" onClick={() => actions.createLeague()}>
+              Create Additional League
+            </button>
+          </div>
         </div>
       </section>
     )
@@ -23,67 +29,109 @@ export const DashboardPage = () => {
   const canSimulate = state.phase === 'regular-season' || state.phase === 'playoffs'
 
   return (
-    <section className="grid">
-      <article className="card">
-        <h2>League Control</h2>
-        <p>Active League: {activeLeagueId ?? 'None'}</p>
-        <label>
-          Select League:{' '}
-          <select value={activeLeagueId ?? ''} onChange={(event) => actions.selectLeague(event.target.value)}>
-            {leagues.map((league) => (
-              <option key={league.id} value={league.id}>
-                {league.name} ({league.activeSeasonId})
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="actions">
-          <button onClick={() => actions.createLeague()}>Create New League</button>
-        </div>
-      </article>
+    <>
+      <header className="pageHeader">
+        <h1 className="pageTitle">Dashboard</h1>
+        <p className="pageMeta">League operations, season controls, and franchise pulse.</p>
+      </header>
 
-      <article className="card">
-        <h2>Season Status</h2>
-        <p>Phase: {state.phase}</p>
-        <p>Season Start: {new Date(state.metadata.createdAt).toISOString().slice(0, 10)}</p>
-        <p>Played Matches: {played}</p>
-        <p>Remaining Matches: {pending}</p>
-        <div className="actions">
-          <button onClick={() => actions.simulateMatch()} disabled={!canSimulate}>
-            Sim Next Match
-          </button>
-          <button onClick={() => actions.simulateSeason()} disabled={!canSimulate}>
-            Sim Full Season
-          </button>
-          <button onClick={() => actions.advanceSeason()} disabled={state.phase !== 'complete'}>
-            Advance To Next Season
-          </button>
-        </div>
-      </article>
+      <section className="grid">
+        <article className="panel">
+          <div className="panelHeader">League Control</div>
+          <div className="panelBody">
+            <p>
+              Active League: <span className="chip chipInfo">{activeLeagueId ?? 'None'}</span>
+            </p>
+            <label>
+              Select League:{' '}
+              <select className="selectControl" value={activeLeagueId ?? ''} onChange={(event) => actions.selectLeague(event.target.value)}>
+                {leagues.map((league) => (
+                  <option key={league.id} value={league.id}>
+                    {league.name} ({league.activeSeasonId})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="actions">
+              <button className="btnSecondary" onClick={() => actions.createLeague()}>
+                Create New League
+              </button>
+            </div>
+          </div>
+        </article>
 
-      <article className="card">
-        <h2>My Franchise</h2>
-        {userTeam ? (
-          <>
-            <p>{userTeam.name}</p>
-            <p>Points: {userTeam.points}</p>
-            <p>Budget Remaining: {formatCr(userTeam.budgetRemaining)}</p>
-          </>
-        ) : (
-          <p>Not available.</p>
-        )}
-      </article>
+        <article className="panel">
+          <div className="panelHeader">Season Status</div>
+          <div className="panelBody">
+            <div className="metricGrid">
+              <div className="metricTile">
+                <span>Phase</span>
+                <strong>{state.phase}</strong>
+              </div>
+              <div className="metricTile">
+                <span>Season Start</span>
+                <strong>{new Date(state.metadata.createdAt).toISOString().slice(0, 10)}</strong>
+              </div>
+              <div className="metricTile">
+                <span>Played</span>
+                <strong>{played}</strong>
+              </div>
+              <div className="metricTile">
+                <span>Remaining</span>
+                <strong>{pending}</strong>
+              </div>
+            </div>
+            <div className="actions">
+              <button className="btnSuccess" onClick={() => actions.simulateMatch()} disabled={!canSimulate}>
+                Sim Next Match
+              </button>
+              <button className="btnPrimary" onClick={() => actions.simulateSeason()} disabled={!canSimulate}>
+                Sim Full Season
+              </button>
+              <button className="btnSecondary" onClick={() => actions.advanceSeason()} disabled={state.phase !== 'complete'}>
+                Advance To Next Season
+              </button>
+            </div>
+          </div>
+        </article>
 
-      <article className="card">
-        <h2>Top Teams</h2>
-        <ol>
-          {views.teams.slice(0, 5).map((team) => (
-            <li key={team.id}>
-              {team.name} ({team.points} pts)
-            </li>
-          ))}
-        </ol>
-      </article>
-    </section>
+        <article className="panel">
+          <div className="panelHeader">My Franchise</div>
+          <div className="panelBody">
+            {userTeam ? (
+              <div className="metricGrid">
+                <div className="metricTile">
+                  <span>Team</span>
+                  <strong>{userTeam.name}</strong>
+                </div>
+                <div className="metricTile">
+                  <span>Points</span>
+                  <strong>{userTeam.points}</strong>
+                </div>
+                <div className="metricTile">
+                  <span>Budget Remaining</span>
+                  <strong>{formatCr(userTeam.budgetRemaining)}</strong>
+                </div>
+              </div>
+            ) : (
+              <p className="muted">Not available.</p>
+            )}
+          </div>
+        </article>
+
+        <article className="panel">
+          <div className="panelHeader">Top Teams</div>
+          <div className="panelBody">
+            <ol className="listPlain">
+              {views.teams.slice(0, 5).map((team) => (
+                <li key={team.id}>
+                  <strong>{team.name}</strong> <span className="muted">({team.points} pts)</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </article>
+      </section>
+    </>
   )
 }

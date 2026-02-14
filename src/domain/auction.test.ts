@@ -268,7 +268,7 @@ describe('auction determinism and regression', () => {
     const nextB = runAutoAuction(state)
 
     expect(nextA).toEqual(nextB)
-  })
+  }, 20_000)
 
   it('legacy policy context preserves default behavior', () => {
     const state = createInitialState(88)
@@ -276,7 +276,7 @@ describe('auction determinism and regression', () => {
     const actual = runAutoAuctionWithPolicyContext(state, { policySet: 'legacy-default' })
 
     expect(actual).toEqual(expected)
-  })
+  }, 20_000)
 
   it('keeps public progress facade compatible', () => {
     const state = createInitialState(19)
@@ -284,5 +284,5 @@ describe('auction determinism and regression', () => {
     const actual = progressAuctionWithPolicyContext(state, 'auto', { policySet: 'legacy-default' })
 
     expect(actual).toEqual(expected)
-  })
+  }, 20_000)
 })

@@ -68,4 +68,10 @@ describe('player generation', () => {
     expect(assignedPlayers.length).toBe(state.players.length)
     expect(state.teams.every((team) => team.budgetRemaining >= 0 && team.budgetRemaining < state.config.auctionBudget)).toBe(true)
   })
+
+  it('produces unique player names in a generated pool', () => {
+    const state = createInitialState(1234)
+    const names = state.players.map((player) => `${player.firstName} ${player.lastName}`)
+    expect(new Set(names).size).toBe(names.length)
+  })
 })

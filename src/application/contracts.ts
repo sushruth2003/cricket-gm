@@ -110,6 +110,9 @@ const inningsSchema = z.object({
       fours: z.number().int().min(0),
       sixes: z.number().int().min(0),
       out: z.boolean(),
+      dismissalKind: z.enum(['caught', 'bowled', 'caught-and-bowled', 'lbw', 'run-out']).nullable().default(null),
+      dismissedByPlayerId: z.string().nullable().default(null),
+      assistedByPlayerId: z.string().nullable().default(null),
     }),
   ),
   bowling: z.array(

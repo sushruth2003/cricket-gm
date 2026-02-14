@@ -20,6 +20,32 @@ const toEconomy = (line: PlayerBowlingLine) => {
   return (line.runsConceded / line.overs).toFixed(2)
 }
 
+const toDismissalLabel = (line: PlayerBattingLine, playersById: Map<string, { firstName: string; lastName: string }>) => {
+  if (!line.out) {
+    return 'not out'
+  }
+
+  const dismissedBy = line.dismissedByPlayerId ? playersById.get(line.dismissedByPlayerId) : null
+  const assistedBy = line.assistedByPlayerId ? playersById.get(line.assistedByPlayerId) : null
+  const dismissedByName = toName(dismissedBy?.firstName, dismissedBy?.lastName)
+  const assistedByName = toName(assistedBy?.firstName, assistedBy?.lastName)
+
+  switch (line.dismissalKind) {
+    case 'caught':
+      return `c ${assistedByName} b ${dismissedByName}`
+    case 'bowled':
+      return `b ${dismissedByName}`
+    case 'caught-and-bowled':
+      return `c&b ${dismissedByName}`
+    case 'lbw':
+      return `lbw b ${dismissedByName}`
+    case 'run-out':
+      return `run out (${dismissedByName})`
+    default:
+      return 'out'
+  }
+}
+
 export const MatchScorecardPage = () => {
   const { matchId } = useParams<{ matchId: string }>()
   const { state } = useApp()
@@ -81,7 +107,7 @@ export const MatchScorecardPage = () => {
                 return (
                   <tr key={line.playerId}>
                     <td>{toName(player?.firstName, player?.lastName)}</td>
-                    <td>{line.out ? 'out' : 'not out'}</td>
+                    <td>{toDismissalLabel(line, playersById)}</td>
                     <td>{line.runs}</td>
                     <td>{line.balls}</td>
                     <td>{line.fours}</td>
@@ -151,28 +177,35 @@ export const MatchScorecardPage = () => {
   }
 
   return (
-    <section className="scorecardPage">
-      <header className="scorecardHeader">
-        <div>
-          <p className="scorecardRound">Round {match.round}</p>
-          <h2>
-            {homeTeam?.name ?? 'Home'} vs {awayTeam?.name ?? 'Away'}
-          </h2>
-          <p className="scorecardResult">{match.played ? match.margin : 'Match not played yet'}</p>
-        </div>
-        <Link className="fixtureBackLink" to="/fixtures">
-          Back to fixtures
-        </Link>
+    <>
+      <header className="pageHeader">
+        <h1 className="pageTitle">Match Scorecard</h1>
+        <p className="pageMeta">Innings-by-innings batting and bowling breakdown.</p>
       </header>
 
-      {!match.played || !match.innings ? (
-        <section className="card">
-          <h3>Scorecard unavailable</h3>
-          <p>Simulate this fixture to generate innings-level stats.</p>
-        </section>
-      ) : (
-        <div className="inningsStack">{match.innings.map(renderInnings)}</div>
-      )}
-    </section>
+      <section className="scorecardPage">
+        <header className="scorecardHeader">
+          <div>
+            <p className="scorecardRound">Round {match.round}</p>
+            <h2>
+              {homeTeam?.name ?? 'Home'} vs {awayTeam?.name ?? 'Away'}
+            </h2>
+            <p className="scorecardResult">{match.played ? match.margin : 'Match not played yet'}</p>
+          </div>
+          <Link className="fixtureBackLink" to="/fixtures">
+            Back to fixtures
+          </Link>
+        </header>
+
+        {!match.played || !match.innings ? (
+          <section className="card">
+            <h3>Scorecard unavailable</h3>
+            <p>Simulate this fixture to generate innings-level stats.</p>
+          </section>
+        ) : (
+          <div className="inningsStack">{match.innings.map(renderInnings)}</div>
+        )}
+      </section>
+    </>
   )
 }

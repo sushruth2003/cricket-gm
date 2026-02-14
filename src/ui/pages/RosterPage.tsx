@@ -223,67 +223,73 @@ export const RosterPage = () => {
   }
 
   return (
-    <section className="teamPage">
-      <div className="teamPanel">
-        <div>
-          <h2>{userTeam.name}</h2>
-          <p className="teamSub">Roster control and lineup stats</p>
-          <div className="teamMetrics">
-            <div className="metricTile">
-              <span>Record</span>
-              <strong>
-                {userTeam.wins}-{userTeam.losses}
-              </strong>
+    <>
+      <header className="pageHeader">
+        <h1 className="pageTitle">Roster</h1>
+        <p className="pageMeta">Manage your XI, bowling preset, and wicketkeeper assignment.</p>
+      </header>
+
+      <section className="teamPage">
+        <div className="teamPanel">
+          <div>
+            <h2>{userTeam.name}</h2>
+            <p className="teamSub">Roster control and lineup stats</p>
+            <div className="teamMetrics">
+              <div className="metricTile">
+                <span>Record</span>
+                <strong>
+                  {userTeam.wins}-{userTeam.losses}
+                </strong>
+              </div>
+              <div className="metricTile">
+                <span>Team Rating</span>
+                <strong>{derived.rating.toFixed(1)}</strong>
+              </div>
+              <div className="metricTile">
+                <span>Available Slots</span>
+                <strong>{state.config.maxSquadSize - rosterPlayers.length}</strong>
+              </div>
+              <div className="metricTile">
+                <span>Budget Left</span>
+                <strong>{formatCr(userTeam.budgetRemaining)}</strong>
+              </div>
             </div>
-            <div className="metricTile">
-              <span>Team Rating</span>
-              <strong>{derived.rating.toFixed(1)}</strong>
-            </div>
-            <div className="metricTile">
-              <span>Available Slots</span>
-              <strong>{state.config.maxSquadSize - rosterPlayers.length}</strong>
-            </div>
-            <div className="metricTile">
-              <span>Budget Left</span>
-              <strong>{formatCr(userTeam.budgetRemaining)}</strong>
+            <div className="teamLineStats">
+              <span>XI: {derived.starters}/11</span>
+              <span>Bat: {derived.avgBat.toFixed(1)}</span>
+              <span>Bowl: {derived.avgBowl.toFixed(1)}</span>
+              <span>Field: {derived.avgFielding.toFixed(1)}</span>
+              <span>WK: {activeWicketkeeper ? playerNameById.get(activeWicketkeeper) ?? 'Unknown' : '--'}</span>
             </div>
           </div>
-          <div className="teamLineStats">
-            <span>XI: {derived.starters}/11</span>
-            <span>Bat: {derived.avgBat.toFixed(1)}</span>
-            <span>Bowl: {derived.avgBowl.toFixed(1)}</span>
-            <span>Field: {derived.avgFielding.toFixed(1)}</span>
-            <span>WK: {activeWicketkeeper ? playerNameById.get(activeWicketkeeper) ?? 'Unknown' : '--'}</span>
+
+          <div className="teamControls">
+            <label>
+              Bowling preset
+              <select
+                value={preset}
+                onChange={(event) =>
+                  setPresetOverrideByTeam((current) => ({
+                    ...current,
+                    [userTeam.id]: event.target.value as 'balanced' | 'aggressive' | 'defensive',
+                  }))
+                }
+              >
+                <option value="balanced">Balanced</option>
+                <option value="aggressive">Aggressive</option>
+                <option value="defensive">Defensive</option>
+              </select>
+            </label>
+
+            <button type="button" onClick={onAutoSort} disabled={rosterPlayers.length === 0}>
+              Auto Pick XI (Composite)
+            </button>
+            <p className="teamHint">Drag handles to reorder lineup. Team setup auto-saves when your XI is valid.</p>
           </div>
         </div>
 
-        <div className="teamControls">
-          <label>
-            Bowling preset
-            <select
-              value={preset}
-              onChange={(event) =>
-                setPresetOverrideByTeam((current) => ({
-                  ...current,
-                  [userTeam.id]: event.target.value as 'balanced' | 'aggressive' | 'defensive',
-                }))
-              }
-            >
-              <option value="balanced">Balanced</option>
-              <option value="aggressive">Aggressive</option>
-              <option value="defensive">Defensive</option>
-            </select>
-          </label>
-
-          <button type="button" onClick={onAutoSort} disabled={rosterPlayers.length === 0}>
-            Auto Pick XI (Composite)
-          </button>
-          <p className="teamHint">Drag handles to reorder lineup. Team setup auto-saves when your XI is valid.</p>
-        </div>
-      </div>
-
-      <div className="tableWrap rosterTableWrap">
-        <table className="rosterTable">
+        <div className="tableWrap rosterTableWrap">
+          <table className="rosterTable">
           <thead>
             <tr>
               <th>Move</th>
@@ -405,8 +411,9 @@ export const RosterPage = () => {
               )
             })}
           </tbody>
-        </table>
-      </div>
-    </section>
+          </table>
+        </div>
+      </section>
+    </>
   )
 }

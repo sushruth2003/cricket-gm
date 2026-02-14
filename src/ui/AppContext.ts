@@ -27,6 +27,8 @@ export interface AppContextValue {
     auctionSkipToPlayer: (playerId: string) => Promise<void>
     startSeason: () => Promise<void>
     simulateMatch: () => Promise<void>
+    simulateMatches: (count: number) => Promise<void>
+    simulateToRegularSeasonEnd: () => Promise<void>
     simulateSeason: () => Promise<void>
     advanceSeason: () => Promise<void>
     updateTeamSetup: (input: {
